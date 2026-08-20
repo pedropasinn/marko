@@ -28,9 +28,9 @@ def test_repository_case_preserves_known_facts_and_blocks_unknowns() -> None:
 def test_complete_fixed_rate_case_builds_compounded_liability() -> None:
     case = PersonalCase(
         "BRL",
-        Money.of("50000", "BRL"),
-        "Mãe",
-        Money.of("2000", "BRL"),
+        Money.of("25000", "BRL"),
+        "Credor sintético",
+        Money.of("1000", "BRL"),
         date(2026, 1, 1),
         date(2027, 1, 1),
         InterestTerms(
@@ -48,7 +48,7 @@ def test_complete_fixed_rate_case_builds_compounded_liability() -> None:
         "BR",
     )
     assert case.readiness_issues() == ()
-    assert case.to_liability().cashflows[0].amount == Money.of("55000", "BRL")
+    assert case.to_liability().cashflows[0].amount == Money.of("27500", "BRL")
     policy = case.to_policy(datetime(2026, 1, 1, tzinfo=UTC))
     assert policy.liability_ids == ("family-loan",)
     assert case.to_universe(date(2026, 1, 1)).eligible_instruments() == ("CDI",)

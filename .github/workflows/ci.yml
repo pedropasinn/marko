@@ -36,6 +36,38 @@ jobs:
       - name: Tests
         run: uv run pytest --cov=marko --cov-report=term-missing --cov-fail-under=80
 
+  persistence-integration:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+        env:
+          POSTGRES_DB: marko_test
+          POSTGRES_USER: marko
+          POSTGRES_PASSWORD: marko_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marko -d marko_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MARKO_TEST_POSTGRES_DSN: postgresql://marko:marko_test@localhost:5432/marko_test
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install uv==0.11.3
+      - name: Install persistence adapters
+        run: uv sync --group dev --extra persistence --frozen
+      - name: Persistence tests
+        run: uv run pytest -m persistence
+
   upstream-integration:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

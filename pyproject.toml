@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marko"
-version = "0.2.1"
+version = "0.3.0"
 description = "Núcleo auditável de um gestor quantitativo pessoal orientado a passivos"
 requires-python = ">=3.12"
 dependencies = ["numpy>=2.0"]
@@ -13,6 +13,10 @@ dependencies = ["numpy>=2.0"]
 research = [
   "PyPortfolioOpt==1.6.0",
   "skfolio==0.20.2",
+]
+persistence = [
+  "psycopg[binary]==3.3.4",
+  "pyarrow==25.0.1",
 ]
 
 [project.scripts]
@@ -32,7 +36,10 @@ packages = ["src/marko"]
 [tool.pytest.ini_options]
 addopts = "--strict-markers --strict-config"
 testpaths = ["tests"]
-markers = ["optional: integração com bibliotecas quantitativas opcionais"]
+markers = [
+  "optional: integração com bibliotecas quantitativas opcionais",
+  "persistence: integração com PostgreSQL e Parquet",
+]
 
 [tool.ruff]
 line-length = 100
@@ -47,5 +54,5 @@ strict = true
 packages = ["marko"]
 
 [[tool.mypy.overrides]]
-module = ["pypfopt.*", "skfolio.*"]
+module = ["psycopg.*", "pyarrow.*", "pypfopt.*", "skfolio.*"]
 ignore_missing_imports = true

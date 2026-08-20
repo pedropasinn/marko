@@ -4,7 +4,7 @@ Use este documento junto com `CONTEXT.md`, `docs/adr/` e o código. Ele descreve
 
 ## Pedido original
 
-Construir um gestor quantitativo pessoal orientado a um capital inicial de R$ 50 mil proveniente de empréstimo familiar e aportes mensais de R$ 2 mil. O sistema deve manter uma tese, contabilizar patrimônio e passivo, comparar modelos, medir risco, propor alocações e explicar decisões. IA produz evidências, features e hipóteses; nunca converte notícias diretamente em ordens.
+Construir um gestor quantitativo pessoal orientado a um capital inicial associado a um passivo e a aportes periódicos. Valores, datas e relações reais pertencem apenas à configuração privada. O sistema deve manter uma tese, contabilizar patrimônio e passivo, comparar modelos, medir risco, propor alocações e explicar decisões. IA produz evidências, features e hipóteses; nunca converte notícias diretamente em ordens.
 
 O princípio do produto é:
 
@@ -14,7 +14,7 @@ Não existe autorização para investir, recomendar uma carteira real ou enviar 
 
 ## Estado atual
 
-O pacote está na versão `0.2.1` em endurecimento. Persistência está bloqueada até este gate fechar. Foram concluídos:
+O pacote está na versão `0.3.0`. Foram concluídos:
 
 1. arqueologia de onze projetos open source;
 2. kernel contábil e de política;
@@ -29,12 +29,22 @@ O pacote está na versão `0.2.1` em endurecimento. Persistência está bloquead
 11. reversões contábeis refletidas nos lotes por `as_of`;
 12. valuation completo/incompleto com proveniência;
 13. candidatos pós-validados obrigatórios na decisão.
+14. contratos de serialização JSON canônicos e versionados;
+15. portas de repositório sem dependência de driver no domínio;
+16. PostgreSQL append-only para Activity, Observation, ModelRun e DecisionPacket;
+17. datasets Parquet imutáveis para observações;
+18. migrações com advisory lock e checksum;
+19. backup verificado e restore idempotente;
+20. scheduler shadow e reconciliação de referências ponto-no-tempo.
+21. casos dourados de TWR com aportes, transferências, FX e corporate actions.
 
 Validação atual:
 
-- 75 testes do quality gate, 1 integração opcional e 86% de cobertura;
+- 92 testes locais aprovados, 2 integrações condicionais e 84% de cobertura;
 - Ruff aprovado;
 - MyPy estrito aprovado;
+- Parquet exercitado localmente;
+- PostgreSQL 16 e Parquet aprovados no job dedicado do CI;
 - BCB/SGS e IBGE/SIDRA exercitados ao vivo;
 - adapters skfolio e PyPortfolioOpt retornando candidatos factíveis;
 - onze snapshots upstream limpos e oito spikes reproduzíveis preservados.
@@ -192,6 +202,25 @@ Validação precede modelos avançados.
 
 O resultado não altera ledger nem envia ordens.
 
+### `persistence/`
+
+Contém:
+
+- portas para Activity, Observation, ModelRun e DecisionPacket;
+- codecs explícitos `schema@version` com JSON canônico e SHA-256;
+- `PostgresStore` com append idempotente, conflito por hash e leitura verificada;
+- migrações SQL numeradas, transacionais, serializadas e protegidas por checksum;
+- `ParquetObservationStore` para datasets imutáveis de pesquisa;
+- backup atômico, verificação de hash e restore idempotente.
+
+PostgreSQL é a fonte operacional. Parquet não sobrescreve Accounting ou Decision Truth.
+
+### `shadow.py`
+
+Agenda ciclos mensais de modo determinístico, preservando timezone, instante agendado e `knowledge_cutoff`. A reconciliação exige ModelRuns exatos e rejeita evidência que ainda não estava disponível quando o DecisionPacket foi criado.
+
+O módulo não aprova nem executa operações.
+
 ## Upstreams estudados
 
 Os clones ficam fora do produto, em `/home/pedro/repo/marko-references`. O snapshot exato está em `upstreams.lock.json`.
@@ -247,6 +276,11 @@ uv run mypy
 uv run marko status
 uv run marko fetch-bcb 1178 --start 2026-08-18 --end 2026-08-19 --unit "% a.a."
 uv run marko fetch-sidra IPCA --table 1737 --variable 2266 --period "last 1"
+uv sync --group dev --extra persistence
+MARKO_DATABASE_URL=postgresql://... uv run marko db-migrate
+MARKO_DATABASE_URL=postgresql://... uv run marko backup var/private/backup.json
+uv run marko backup-verify var/private/backup.json
+uv run marko shadow-due --day 20 --after 2026-07-20T13:00:00+00:00 --until 2026-08-20T13:00:00+00:00
 ```
 
 ## Informações ainda necessárias do proprietário
@@ -267,14 +301,12 @@ Somente depois disso gerar IPS real. Mesmo com o IPS completo, capital real cont
 
 ## Próxima sequência recomendada
 
-1. concluir a v0.2.1 e seus invariantes;
-2. obter os nove dados pessoais em configuração privada e gerar IPS/Liability;
-3. adicionar casos dourados de TWR multimoeda;
-4. implementar regras fiscais brasileiras por instrumento/prazo;
-5. somente então persistir ledger, observations, ModelRuns e DecisionPackets em PostgreSQL/Parquet;
-6. configurar endpoints/credenciais de Tesouro, ANBIMA e B3;
-7. operar shadow portfolio com CDI, 1/N e carteira real como benchmarks;
-8. só então avançar para Black–Litterman, HRP/HERC/NCO, CVaR/CDaR e ensemble dentro do produto.
+1. obter os nove dados pessoais em configuração privada e gerar IPS/Liability;
+2. implementar regras fiscais brasileiras por instrumento/prazo;
+3. configurar endpoints/credenciais de Tesouro, ANBIMA e B3;
+4. definir benchmarks, periodicidade e duração mínima da operação shadow;
+5. operar shadow portfolio com CDI, 1/N e carteira real como benchmarks;
+6. só então avançar para Black–Litterman, HRP/HERC/NCO, CVaR/CDaR e ensemble dentro do produto.
 
 ## Regras para qualquer continuação
 
@@ -288,3 +320,6 @@ Somente depois disso gerar IPS real. Mesmo com o IPS completo, capital real cont
 - nunca persistir valuation parcial como patrimônio total;
 - nunca encaminhar `PortfolioCandidate` bruto à decisão;
 - nunca incorporar código de licença incompatível sem revisão jurídica e ADR.
+- nunca reescrever um fato persistido para corrigir o histórico;
+- nunca restaurar backup ou dataset sem verificar schema e hash;
+- nunca executar ciclo shadow com evidência posterior ao DecisionPacket.

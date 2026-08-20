@@ -45,6 +45,19 @@
 - CI em quality gate, integração opcional e provider smoke.
 - 75 testes do quality gate, 1 integração opcional, 86% de cobertura, Ruff e MyPy strict aprovados.
 
+## 20/08/2026 — Marko 0.3.0 Persistence and Shadow Readiness
+
+- envelopes JSON canônicos e versionados para as quatro verdades persistidas;
+- portas próprias e adapter PostgreSQL append-only;
+- migrações empacotadas com advisory lock e checksum;
+- datasets de observações em Parquet imutável e endereçado por conteúdo;
+- backup atômico, verificação de integridade e restore idempotente;
+- scheduler mensal shadow com timezone e corte de conhecimento;
+- reconciliação de ModelRuns, candidatos e evidências ponto-no-tempo;
+- casos dourados de TWR com fluxos, transferências, FX e corporate actions;
+- CLI operacional e job de integração PostgreSQL 16/Parquet.
+- 92 testes locais aprovados, 2 integrações condicionais e 84% de cobertura.
+
 ## Como este diário evolui
 
 Cada versão deve registrar decisões, resultados negativos, incompatibilidades e dívidas técnicas. O changelog descreve o que mudou; este diário explica por que a direção mudou.

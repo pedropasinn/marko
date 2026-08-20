@@ -39,3 +39,13 @@
 - aprovação humana é explícita, atribuível e expira;
 - execução só é concluída após confirmação e reconciliação;
 - explicação referencia evidências e versões usadas.
+
+## Persistência e shadow
+
+- serialização usa schema e versão próprios;
+- repetir identidade com o mesmo hash é idempotente; hash diferente é conflito;
+- fatos operacionais persistidos não aceitam UPDATE ou DELETE;
+- migração aplicada preserva checksum;
+- backup e Parquet são verificados antes do uso;
+- ciclo shadow usa somente ModelRuns e evidências disponíveis no corte da decisão;
+- scheduler shadow nunca implica aprovação ou execução.

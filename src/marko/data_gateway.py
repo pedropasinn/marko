@@ -52,7 +52,7 @@ class UrlLibJsonTransport:
     def get_json(
         self, url: str, headers: Mapping[str, str] | None = None
     ) -> list[dict[str, Any]] | dict[str, Any]:
-        request_headers = {"User-Agent": "Marko/0.2.1"}
+        request_headers = {"User-Agent": "Marko/0.3.0"}
         request_headers.update(headers or {})
         request = Request(url, headers=request_headers)
         last_error: TimeoutError | URLError | None = None

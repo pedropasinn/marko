@@ -31,6 +31,12 @@ from marko.portfolio_lab import (
     RiskBudgeting,
 )
 from marko.reconciliation import BrokerStatement, ReconciliationReport, reconcile
+from marko.shadow import (
+    MonthlyShadowSchedule,
+    ShadowReconciliation,
+    ShadowRunRequest,
+    reconcile_shadow_packet,
+)
 from marko.snapshots import (
     FxQuote,
     IncompleteValuationError,
@@ -74,6 +80,7 @@ __all__ = [
     "LiabilityCashflow",
     "MinimumVariance",
     "Money",
+    "MonthlyShadowSchedule",
     "NoAction",
     "Observation",
     "ObservationStore",
@@ -84,6 +91,8 @@ __all__ = [
     "ReconciliationReport",
     "RiskBudgeting",
     "SeriesQuery",
+    "ShadowReconciliation",
+    "ShadowRunRequest",
     "SidraProvider",
     "TaxLotReport",
     "TimeCoordinates",
@@ -97,6 +106,7 @@ __all__ = [
     "load_case",
     "maximum_drawdown",
     "reconcile",
+    "reconcile_shadow_packet",
     "shortfall",
     "time_weighted_return",
     "xirr",

@@ -182,13 +182,13 @@ Investment Policy Statement
 Liability
 ```
 
-Isso é especialmente importante porque os R$ 50 mil não são simplesmente patrimônio disponível: existe uma obrigação econômica associada ao empréstimo. Essa condição muda o problema de otimização.
+Isso é especialmente importante porque o capital inicial sintético não é simplesmente patrimônio disponível: existe uma obrigação econômica associada. Essa condição muda o problema de otimização.
 
 O Marko não deveria inicialmente representar:
 
 ```text
 Pedro
-Assets = R$ 50.000
+Assets = R$ 25.000
 ```
 
 mas algo conceitualmente como:
@@ -197,10 +197,10 @@ mas algo conceitualmente como:
 BALANCE SHEET
 
 Assets
-Investments          R$ 50.000
+Investments          R$ 25.000
 
 Liabilities
-Family loan           R$ 50.000
+Synthetic liability   R$ 25.000
 ```
 
 A partir disso podemos definir:
@@ -240,7 +240,7 @@ FundingRatio
 ShortfallRisk
 ```
 
-Mesmo que inicialmente sua mãe não cobre juros e não exista uma data rígida para devolução.
+Mesmo que inicialmente o caso sintético não tenha juros nem data rígida para devolução.
 
 Podemos representar:
 
@@ -540,7 +540,7 @@ C 32%
 D 25%
 ```
 
-Entram R$ 2.000.
+Entram R$ 1.000 sintéticos.
 
 Em vez de:
 
@@ -1001,7 +1001,7 @@ Portfolio
 ...
 
 New cash
-R$2.000
+R$1.000 sintéticos
 
 Liabilities
 ...
@@ -1280,7 +1280,7 @@ Isso nos dará um chão muito firme.
 
 O Marko não deverá começar perguntando:
 
-> “O que comprar com R$50.000?”
+> “O que comprar com o capital disponível?”
 
 A primeira sessão real dele deveria ser:
 
