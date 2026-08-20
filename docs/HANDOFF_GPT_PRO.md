@@ -14,7 +14,7 @@ Não existe autorização para investir, recomendar uma carteira real ou enviar 
 
 ## Estado atual
 
-O pacote está na versão `0.3.0` em validação. Foram concluídos:
+O pacote está na versão `0.3.0`. Foram concluídos:
 
 1. arqueologia de onze projetos open source;
 2. kernel contábil e de política;
@@ -44,7 +44,7 @@ Validação atual:
 - Ruff aprovado;
 - MyPy estrito aprovado;
 - Parquet exercitado localmente;
-- PostgreSQL 16 coberto por job dedicado do CI;
+- PostgreSQL 16 e Parquet aprovados no job dedicado do CI;
 - BCB/SGS e IBGE/SIDRA exercitados ao vivo;
 - adapters skfolio e PyPortfolioOpt retornando candidatos factíveis;
 - onze snapshots upstream limpos e oito spikes reproduzíveis preservados.
@@ -301,14 +301,12 @@ Somente depois disso gerar IPS real. Mesmo com o IPS completo, capital real cont
 
 ## Próxima sequência recomendada
 
-1. validar PostgreSQL 16 no CI e fechar a v0.3.0;
-2. obter os nove dados pessoais em configuração privada e gerar IPS/Liability;
-3. adicionar casos dourados de TWR multimoeda;
-4. implementar regras fiscais brasileiras por instrumento/prazo;
-5. configurar endpoints/credenciais de Tesouro, ANBIMA e B3;
-6. definir benchmarks, periodicidade e duração mínima da operação shadow;
-7. operar shadow portfolio com CDI, 1/N e carteira real como benchmarks;
-8. só então avançar para Black–Litterman, HRP/HERC/NCO, CVaR/CDaR e ensemble dentro do produto.
+1. obter os nove dados pessoais em configuração privada e gerar IPS/Liability;
+2. implementar regras fiscais brasileiras por instrumento/prazo;
+3. configurar endpoints/credenciais de Tesouro, ANBIMA e B3;
+4. definir benchmarks, periodicidade e duração mínima da operação shadow;
+5. operar shadow portfolio com CDI, 1/N e carteira real como benchmarks;
+6. só então avançar para Black–Litterman, HRP/HERC/NCO, CVaR/CDaR e ensemble dentro do produto.
 
 ## Regras para qualquer continuação
 

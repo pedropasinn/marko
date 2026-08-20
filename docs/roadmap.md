@@ -12,9 +12,15 @@ Fronteira público/privado, reversões e lotes, activity matrix, valuation compl
 
 ### v0.3.0 — Persistence and Shadow Readiness
 
-Estado: em desenvolvimento.
+Estado: concluída em 20/08/2026.
 
 Portas de repositório, contratos de serialização versionados, PostgreSQL operacional, Parquet de pesquisa, migrações, round trips, idempotência, backup/restore, scheduler shadow e reconciliação.
+
+### v0.4.0 — Personal IPS and Shadow Operation
+
+Estado: aguardando informações e acessos do proprietário.
+
+Liability/IPS/Universe reais em configuração privada, conectores atuais de Tesouro Direto/ANBIMA/B3, benchmarks CDI e 1/N, diário de decisões, relatórios de drift/risco e operação shadow sem capital real.
 
 ## Gates de capacidade
 
@@ -28,7 +34,7 @@ Portas de repositório, contratos de serialização versionados, PostgreSQL oper
 | G6 | Advanced Models | não iniciado |
 | G7 | Decision | draft por aporte e candidato validado |
 | G8 | Research Agents | não iniciado |
-| G9 | Shadow | scheduler e reconciliação PIT em validação; operação ainda não iniciada |
+| G9 | Shadow | readiness concluída; operação aguarda IPS e providers |
 
 ## Gate para capital real
 
