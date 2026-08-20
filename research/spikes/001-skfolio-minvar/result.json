@@ -1,0 +1,32 @@
+{
+  "assets": [
+    "CDI",
+    "IPCA",
+    "BR_EQ",
+    "GLOBAL_EQ"
+  ],
+  "commits": {
+    "skfolio": "07dd64b3640fc4350d3d092837a978a87e9e4b34"
+  },
+  "configuration": {
+    "long_only": true,
+    "model": "minimum_variance"
+  },
+  "dataset_sha256": "efd7a9679b27ef7171e0b3a64c459abb03df24fd9123661faebf137998e8d7b4",
+  "observations": 504,
+  "packages": {
+    "skfolio": "0.20.2"
+  },
+  "python": "3.12.3",
+  "result": {
+    "solver": "CLARABEL",
+    "weights": {
+      "BR_EQ": 0.002334043287687195,
+      "CDI": 0.9911535847132138,
+      "GLOBAL_EQ": 0.0018400765306908309,
+      "IPCA": 0.004672295468408386
+    }
+  },
+  "runtime_seconds": 0.04157978799776174,
+  "seed": 20260820
+}

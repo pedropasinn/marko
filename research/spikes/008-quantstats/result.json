@@ -1,0 +1,30 @@
+{
+  "assets": [
+    "CDI",
+    "IPCA",
+    "BR_EQ",
+    "GLOBAL_EQ"
+  ],
+  "commits": {
+    "quantstats": "fbd10daed0227aa0d10da6513f1b15e7e98d7fae"
+  },
+  "configuration": {
+    "periods": 252,
+    "portfolio": "equal_weight"
+  },
+  "dataset_sha256": "efd7a9679b27ef7171e0b3a64c459abb03df24fd9123661faebf137998e8d7b4",
+  "observations": 504,
+  "packages": {
+    "quantstats": "0.0.81"
+  },
+  "python": "3.12.3",
+  "result": {
+    "cvar_95": -0.011045308400512962,
+    "max_drawdown": -0.07890525649116387,
+    "sharpe": 1.18510425176159,
+    "sortino": 1.76634718943199,
+    "volatility": 0.09158595026722097
+  },
+  "runtime_seconds": 0.08076257799984887,
+  "seed": 20260820
+}

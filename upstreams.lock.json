@@ -1,0 +1,16 @@
+{
+  "captured_at": "2026-08-20",
+  "repositories": [
+    {"name":"skfolio","url":"https://github.com/skfolio/skfolio.git","branch":"main","commit":"07dd64b3640fc4350d3d092837a978a87e9e4b34","commit_date":"2026-08-13","version":"0.20.2","license":"BSD-3-Clause","shallow":true},
+    {"name":"Riskfolio-Lib","url":"https://github.com/dcajasn/Riskfolio-Lib.git","branch":"master","commit":"632a9e48fbaf2b9f8e83864a492332364b6ed32c","commit_date":"2026-06-21","version":"7.3.0","license":"BSD-3-Clause","shallow":true},
+    {"name":"PyPortfolioOpt","url":"https://github.com/PyPortfolio/PyPortfolioOpt.git","branch":"main","commit":"a6638d2e06dae6f444fd022cfd4b3c528902a85b","commit_date":"2026-07-08","version":"1.6.0","license":"MIT","shallow":true},
+    {"name":"cvxportfolio","url":"https://github.com/cvxgrp/cvxportfolio.git","branch":"master","commit":"351c782b9b8b395c1a5f886b77e0d55f1bc9396e","commit_date":"2026-04-27","version":"dynamic","license":"GPL-3.0","shallow":true},
+    {"name":"vectorbt","url":"https://github.com/polakowo/vectorbt.git","branch":"master","commit":"34b6d5935e3ea3eccd549e2592bc0f455b8045f5","commit_date":"2026-08-02","version":"1.1.0","license":"Apache-2.0 WITH Commons-Clause","shallow":true},
+    {"name":"quantstats","url":"https://github.com/ranaroussi/quantstats.git","branch":"main","commit":"fbd10daed0227aa0d10da6513f1b15e7e98d7fae","commit_date":"2026-01-13","version":"0.0.81","license":"Apache-2.0","shallow":true},
+    {"name":"OpenBB","url":"https://github.com/OpenBB-finance/OpenBB.git","branch":"develop","commit":"3e071fcc2cd9f891cac6040ae60296dba76dab46","commit_date":"2026-07-20","version":"1.6.13","license":"AGPL-3.0","shallow":true},
+    {"name":"qlib","url":"https://github.com/microsoft/qlib.git","branch":"main","commit":"79633dd9506ea689e5400dea0197717b5b3d74b7","commit_date":"2026-07-23","version":"dynamic","license":"MIT","shallow":true},
+    {"name":"ghostfolio","url":"https://github.com/ghostfolio/ghostfolio.git","branch":"main","commit":"7a2ba0d8d665c2bd58a4ca04fb44a66e190bad0c","commit_date":"2026-08-20","version":"3.56.0","license":"AGPL-3.0","shallow":true},
+    {"name":"wealthfolio","url":"https://github.com/wealthfolio/wealthfolio.git","branch":"main","commit":"ac95f786f83c37009dc8d623bca7244bd76c4a24","commit_date":"2026-08-20","version":"3.7.0","license":"AGPL-3.0","shallow":false},
+    {"name":"portfolio-performance","url":"https://github.com/portfolio-performance/portfolio.git","branch":"master","commit":"90b27560fc0804878386911227cac6d01b7a28fa","commit_date":"2026-08-20","version":"0.87.1-SNAPSHOT","license":"EPL-1.0","shallow":false}
+  ]
+}

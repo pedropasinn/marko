@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussão aberta
+    url: https://github.com/pedropasinn/marko/discussions
+    about: Ideias, dúvidas e direção geral do projeto.

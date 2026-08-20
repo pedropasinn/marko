@@ -1,0 +1,32 @@
+{
+  "assets": [
+    "CDI",
+    "IPCA",
+    "BR_EQ",
+    "GLOBAL_EQ"
+  ],
+  "commits": {
+    "riskfolio-lib": "632a9e48fbaf2b9f8e83864a492332364b6ed32c"
+  },
+  "configuration": {
+    "long_only": true,
+    "model": "minimum_variance"
+  },
+  "dataset_sha256": "efd7a9679b27ef7171e0b3a64c459abb03df24fd9123661faebf137998e8d7b4",
+  "observations": 504,
+  "packages": {
+    "riskfolio-lib": "7.3.0"
+  },
+  "python": "3.12.3",
+  "result": {
+    "solver": "['CLARABEL', 'ECOS', 'SCS', 'OSQP', 'CVXOPT']",
+    "weights": {
+      "BR_EQ": 0.0026351486044705603,
+      "CDI": 0.991862508750865,
+      "GLOBAL_EQ": 0.0020110058859318792,
+      "IPCA": 0.0034913367587326126
+    }
+  },
+  "runtime_seconds": 0.04150742599813384,
+  "seed": 20260820
+}

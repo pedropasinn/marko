@@ -1,0 +1,20 @@
+[case]
+base_currency = "BRL"
+monthly_contribution = "2000.00"
+tax_residency = ""
+
+[liability]
+creditor = "Mãe"
+principal = "50000.00"
+originated_on = ""
+maturity_date = ""
+interest_rule = ""
+callable_early = ""
+
+[policy]
+minimum_liquidity = ""
+maximum_drawdown = ""
+
+[access]
+brokers = []
+available_instruments = []

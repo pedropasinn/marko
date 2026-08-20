@@ -1,0 +1,32 @@
+{
+  "assets": [
+    "CDI",
+    "IPCA",
+    "BR_EQ",
+    "GLOBAL_EQ"
+  ],
+  "commits": {
+    "pyportfolioopt": "a6638d2e06dae6f444fd022cfd4b3c528902a85b"
+  },
+  "configuration": {
+    "beta": 0.95,
+    "model": "minimum_cvar"
+  },
+  "dataset_sha256": "efd7a9679b27ef7171e0b3a64c459abb03df24fd9123661faebf137998e8d7b4",
+  "observations": 504,
+  "packages": {
+    "pyportfolioopt": "1.6.0"
+  },
+  "python": "3.12.3",
+  "result": {
+    "solver": "CLARABEL",
+    "weights": {
+      "BR_EQ": 0.00869,
+      "CDI": 0.98996,
+      "GLOBAL_EQ": 0.00135,
+      "IPCA": 0.0
+    }
+  },
+  "runtime_seconds": 0.01900453800044488,
+  "seed": 20260820
+}

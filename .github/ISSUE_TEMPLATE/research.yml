@@ -1,0 +1,29 @@
+name: Pesquisa quantitativa
+description: Proponha um modelo, benchmark, stress ou experimento.
+title: "[Research] "
+labels: [needs-triage, research]
+body:
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hipótese falsificável
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Baseline e benchmark
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validação temporal e critérios de rejeição
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Dados, disponibilidade e risco de look-ahead
+    validations:
+      required: true

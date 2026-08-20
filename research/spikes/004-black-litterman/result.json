@@ -1,0 +1,38 @@
+{
+  "assets": [
+    "CDI",
+    "IPCA",
+    "BR_EQ",
+    "GLOBAL_EQ"
+  ],
+  "commits": {
+    "pyportfolioopt": "a6638d2e06dae6f444fd022cfd4b3c528902a85b"
+  },
+  "configuration": {
+    "model": "black_litterman",
+    "tau": 0.05
+  },
+  "dataset_sha256": "efd7a9679b27ef7171e0b3a64c459abb03df24fd9123661faebf137998e8d7b4",
+  "observations": 504,
+  "packages": {
+    "pyportfolioopt": "1.6.0"
+  },
+  "python": "3.12.3",
+  "result": {
+    "posterior_returns": {
+      "BR_EQ": 0.11817268130728077,
+      "CDI": 0.11272212730111186,
+      "GLOBAL_EQ": 0.12258857931631739,
+      "IPCA": 0.1077007209564277
+    },
+    "solver": "CLARABEL",
+    "weights": {
+      "BR_EQ": 0.0,
+      "CDI": 0.88142,
+      "GLOBAL_EQ": 0.11858,
+      "IPCA": 0.0
+    }
+  },
+  "runtime_seconds": 0.015370662000350421,
+  "seed": 20260820
+}

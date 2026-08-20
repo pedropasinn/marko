@@ -1,0 +1,40 @@
+{
+  "assets": [
+    "CDI",
+    "IPCA",
+    "BR_EQ",
+    "GLOBAL_EQ"
+  ],
+  "commits": {
+    "cvxportfolio": "351c782b9b8b395c1a5f886b77e0d55f1bc9396e"
+  },
+  "configuration": {
+    "risk_aversion": 2.0,
+    "transaction_cost": 0.0005
+  },
+  "dataset_sha256": "efd7a9679b27ef7171e0b3a64c459abb03df24fd9123661faebf137998e8d7b4",
+  "observations": 504,
+  "packages": {
+    "cvxportfolio": "0.1.dev1+g351c782b9"
+  },
+  "python": "3.12.3",
+  "result": {
+    "solver": "CLARABEL",
+    "target_weights": {
+      "BR_EQ": 0.09140148929706991,
+      "CASH": 0.9085985005239877,
+      "CDI": 6.777153721999067e-09,
+      "GLOBAL_EQ": 2.3442576688484137e-09,
+      "IPCA": 1.0575309982956924e-09
+    },
+    "trades": {
+      "BR_EQ": 0.09140148929706991,
+      "CASH": -0.09140149947601228,
+      "CDI": 6.777153721999067e-09,
+      "GLOBAL_EQ": 2.3442576688484137e-09,
+      "IPCA": 1.0575309982956924e-09
+    }
+  },
+  "runtime_seconds": 0.0336398260005808,
+  "seed": 20260820
+}
