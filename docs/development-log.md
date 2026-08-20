@@ -31,6 +31,20 @@
 - `NO_ACTION` e rebalanceamento pelo aporte;
 - 55 testes, 85% de cobertura e fluxo integrado.
 
+## 20/08/2026 — Marko 0.2.1 Integrity Hardening
+
+- persistência suspensa até o fechamento dos invariantes;
+- separação entre exemplo público e configuração financeira privada;
+- correção de reversões em lotes e validação estrita do payload original;
+- activity matrix e rejeição de moedas não cadastradas;
+- valuation completo/incompleto com proveniência de preço e FX;
+- correção da identidade multidimensional SIDRA e hash bruto de vintage;
+- candidato pós-validado obrigatório no caminho de decisão;
+- correções de walk-forward, stress de correlação e caixa explícito;
+- termos de juros estruturados sem conversão para `float`;
+- CI em quality gate, integração opcional e provider smoke.
+- 75 testes do quality gate, 1 integração opcional, 86% de cobertura, Ruff e MyPy strict aprovados.
+
 ## Como este diário evolui
 
 Cada versão deve registrar decisões, resultados negativos, incompatibilidades e dívidas técnicas. O changelog descreve o que mudou; este diário explica por que a direção mudou.

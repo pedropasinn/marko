@@ -56,15 +56,24 @@ def build_tax_lots(
     account_id: str,
     instrument_id: str,
     method: CostBasisMethod = CostBasisMethod.FIFO,
+    as_of: datetime | None = None,
 ) -> TaxLotReport:
     lots: list[TaxLot] = []
     disposals: list[RealizedDisposal] = []
-    for activity in ledger.activities():
+    activities = ledger.activities(as_of)
+    reversed_ids = {
+        activity.correction_of
+        for activity in activities
+        if activity.is_reversal and activity.correction_of is not None
+    }
+    for activity in activities:
+        if activity.is_reversal or activity.activity_id in reversed_ids:
+            continue
         if activity.account_id != account_id or activity.instrument_id != instrument_id:
             continue
         if activity.kind is ActivityKind.SPLIT:
             assert activity.ratio is not None
-            factor = Decimal(1) / activity.ratio if activity.is_reversal else activity.ratio
+            factor = activity.ratio
             lots = [
                 TaxLot(
                     lot.acquired_at, lot.quantity * factor, lot.total_cost, lot.source_activity_id

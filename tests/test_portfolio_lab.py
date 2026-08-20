@@ -1,12 +1,14 @@
 from datetime import UTC, datetime
 
 import numpy as np
+import pytest
 
 from marko.portfolio_lab import (
     EqualWeight,
     InverseVolatility,
     MinimumVariance,
     NoAction,
+    PortfolioCandidate,
     PortfolioProblem,
     RiskBudgeting,
     check_candidate,
@@ -81,3 +83,34 @@ def test_model_run_fixes_context_and_checks_feasibility() -> None:
     registry.append(run)
     registry.append(run)
     assert registry.get(run.run_id) == run
+
+
+def test_candidate_rejects_dimension_and_asset_order_mismatch() -> None:
+    with pytest.raises(ValueError, match="incompatíveis"):
+        PortfolioCandidate("bad", ("A", "B"), (1.0,), 0.0, 0.0, "done")
+    candidate = PortfolioCandidate(
+        "bad-order",
+        tuple(reversed(problem().assets)),
+        (0.2, 0.3, 0.5),
+        0.0,
+        0.1,
+        "done",
+    )
+    assert "asset_order" in check_candidate(candidate, problem())
+
+
+@pytest.mark.optional
+def test_optional_upstream_adapters_return_feasible_candidates() -> None:
+    pytest.importorskip("skfolio")
+    pytest.importorskip("pypfopt")
+    from marko.portfolio_lab import (
+        PyPortfolioOptMinimumVarianceAdapter,
+        SkfolioMinimumVarianceAdapter,
+    )
+
+    task = problem()
+    candidates = (
+        SkfolioMinimumVarianceAdapter().solve(task),
+        PyPortfolioOptMinimumVarianceAdapter().solve(task),
+    )
+    assert all(not check_candidate(candidate, task) for candidate in candidates)

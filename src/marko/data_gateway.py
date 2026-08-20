@@ -22,6 +22,16 @@ class SeriesQuery:
     end: date | None = None
     parameters: tuple[tuple[str, str], ...] = ()
 
+    def __post_init__(self) -> None:
+        if not self.series_id.strip():
+            raise ValueError("series_id é obrigatório")
+        if self.start is not None and self.end is not None and self.start > self.end:
+            raise ValueError("start não pode suceder end")
+        keys = [key for key, _ in self.parameters]
+        if len(keys) != len(set(keys)):
+            raise ValueError("parâmetros duplicados")
+        object.__setattr__(self, "parameters", tuple(sorted(self.parameters)))
+
     def parameter(self, key: str, default: str | None = None) -> str | None:
         return dict(self.parameters).get(key, default)
 
@@ -42,7 +52,7 @@ class UrlLibJsonTransport:
     def get_json(
         self, url: str, headers: Mapping[str, str] | None = None
     ) -> list[dict[str, Any]] | dict[str, Any]:
-        request_headers = {"User-Agent": "Marko/0.2"}
+        request_headers = {"User-Agent": "Marko/0.2.1"}
         request_headers.update(headers or {})
         request = Request(url, headers=request_headers)
         last_error: TimeoutError | URLError | None = None
@@ -99,6 +109,7 @@ class BcbSgsProvider:
                     retrieved_at,
                     vintage_id,
                     (("provider_url", url),),
+                    row,
                 )
             )
         return tuple(observations)
@@ -149,6 +160,7 @@ class SidraProvider:
                     retrieved_at,
                     vintage_id,
                     dimensions,
+                    row,
                 )
             )
         return tuple(observations)
@@ -184,6 +196,7 @@ class TreasuryDirectProvider:
                     retrieved_at,
                     vintage_id,
                     (("instrument", name), ("maturity", maturity)),
+                    record,
                 )
             )
         return tuple(observations)
@@ -225,6 +238,7 @@ class AuthenticatedJsonProvider:
                 retrieved_at,
                 vintage_id,
                 (),
+                record,
             )
             for record in records
         )
@@ -289,16 +303,21 @@ class ObservationStore:
                 if observation.vintage_id == vintage_id
             )
         )
-        source_hash = hashlib.sha256("\n".join(identifiers).encode()).hexdigest()
+        raw_hashes = sorted(
+            observation.raw_payload_hash
+            for observation in self._observations.values()
+            if observation.vintage_id == vintage_id
+        )
+        source_hash = hashlib.sha256("\n".join(raw_hashes).encode()).hexdigest()
         return DataVintage(vintage_id, created_at, source_hash, identifiers)
 
     def latest_as_known_at(self, series_id: str, known_at: datetime) -> tuple[Observation, ...]:
-        latest: dict[datetime, Observation] = {}
+        latest: dict[tuple[datetime, tuple[tuple[str, str], ...]], Observation] = {}
         for observation in self.as_known_at(series_id, known_at):
-            effective = observation.times.effective_at
-            previous = latest.get(effective)
+            identity = (observation.times.effective_at, observation.dimensions)
+            previous = latest.get(identity)
             if previous is None or observation.times.available_at > previous.times.available_at:
-                latest[effective] = observation
+                latest[identity] = observation
         return tuple(latest[key] for key in sorted(latest))
 
 
@@ -326,9 +345,13 @@ def _observation(
     retrieved_at: datetime,
     vintage_id: str,
     dimensions: tuple[tuple[str, str], ...],
+    raw_payload: object,
 ) -> Observation:
     identity = f"{source}|{series_id}|{effective_at.isoformat()}|{value}|{dimensions}|{vintage_id}"
     observation_id = hashlib.sha256(identity.encode()).hexdigest()
+    raw_payload_hash = hashlib.sha256(
+        json.dumps(raw_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
+    ).hexdigest()
     return Observation(
         observation_id,
         series_id,
@@ -337,6 +360,7 @@ def _observation(
         source,
         TimeCoordinates(effective_at, effective_at, retrieved_at, retrieved_at),
         vintage_id,
+        raw_payload_hash,
         dimensions,
         ("availability_conservative",),
     )

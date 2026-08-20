@@ -22,6 +22,14 @@
 - [x] DecisionPacket sem `NO_ACTION` é inválido;
 - [x] cash-flow rebalancing prefere aporte quando respeita o IPS;
 - [x] liquidez mínima pode bloquear um draft sem ocultá-lo;
+- [x] reversões restauram caixa, posição, quantidade e base por `as_of`;
+- [x] transferências exigem pares consistentes e reversão das duas pernas;
+- [x] campos monetários sem efeito são rejeitados;
+- [x] valuation incompleto falha fechado e lista evidências ausentes;
+- [x] observações SIDRA multidimensionais coexistem no mesmo período;
+- [x] `step <= 0`, candidato incompatível e stress inválido são rejeitados;
+- [x] pesos projetados incluem caixa explícito e somam um;
+- [x] CLI cobre configuração válida e arquivo ausente;
 - [ ] casos dourados de TWR com transferências e múltiplas moedas;
 - [ ] confirmação de broker duplicada é idempotente;
 - [ ] impostos brasileiros por instrumento e prazo.

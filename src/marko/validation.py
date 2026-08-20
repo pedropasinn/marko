@@ -4,7 +4,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from marko.portfolio_lab import PortfolioCandidate, PortfolioModel, PortfolioProblem
+from marko.portfolio_lab import (
+    PortfolioCandidate,
+    PortfolioModel,
+    PortfolioProblem,
+    validate_candidate,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +27,9 @@ def walk_forward_splits(
 ) -> tuple[TemporalSplit, ...]:
     if min(sample_count, train_size, test_size) <= 0 or purge < 0:
         raise ValueError("dimensões de split inválidas")
-    stride = step or test_size
+    if step is not None and step <= 0:
+        raise ValueError("step precisa ser positivo")
+    stride = test_size if step is None else step
     splits = []
     test_start = train_size + purge
     while test_start + test_size <= sample_count:
@@ -93,6 +100,7 @@ def evaluate_walk_forward(
             problem.maximum_weights,
         )
         candidate = model.solve(task)
+        validate_candidate(candidate, task)
         weights = np.asarray(candidate.weights)
         portfolio_returns = test @ weights
         current_turnover = turnover(previous, weights) if previous is not None else 0.0
@@ -110,7 +118,12 @@ def evaluate_walk_forward(
                 candidate.weights,
             )
         )
-        previous = weights
+        asset_growth = np.prod(1 + test, axis=0)
+        drifted = weights * asset_growth
+        total = float(drifted.sum())
+        if not np.isfinite(total) or total <= 0:
+            raise ValueError("pesos após drift são inválidos")
+        previous = drifted / total
     return tuple(results)
 
 
@@ -130,6 +143,8 @@ class StabilityResult:
 def weight_stability(candidates: tuple[PortfolioCandidate, ...]) -> StabilityResult:
     if len(candidates) < 2:
         raise ValueError("estabilidade exige ao menos dois candidatos")
+    if any(candidate.assets != candidates[0].assets for candidate in candidates[1:]):
+        raise ValueError("candidatos precisam usar os mesmos assets e ordem")
     matrix = np.asarray([candidate.weights for candidate in candidates])
     center = matrix.mean(axis=0)
     distances = np.abs(matrix - center).sum(axis=1)
@@ -174,10 +189,19 @@ def stress_volatility(
     asset_volatilities: tuple[float, ...],
     correlation: float,
 ) -> float:
-    if len(candidate.weights) != len(asset_volatilities) or not -1 <= correlation <= 1:
+    size = len(candidate.weights)
+    lower_correlation = -1 / (size - 1) if size > 1 else 0
+    if (
+        size != len(asset_volatilities)
+        or not lower_correlation <= correlation <= 1
+        or any(volatility < 0 for volatility in asset_volatilities)
+    ):
         raise ValueError("cenário de correlação incompatível")
     volatilities = np.asarray(asset_volatilities)
     covariance = np.outer(volatilities, volatilities) * correlation
     np.fill_diagonal(covariance, volatilities**2)
     weights = np.asarray(candidate.weights)
-    return float(np.sqrt(weights @ covariance @ weights))
+    eigenvalues = np.linalg.eigvalsh(covariance)
+    if eigenvalues.min() < -1e-12:
+        raise ValueError("matriz de stress não é positiva semidefinida")
+    return float(np.sqrt(max(float(weights @ covariance @ weights), 0.0)))

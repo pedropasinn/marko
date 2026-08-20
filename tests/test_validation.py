@@ -34,6 +34,12 @@ def test_walk_forward_has_purge_and_no_overlap() -> None:
     assert results[0].realized_return == results[0].gross_return - results[0].estimated_cost
 
 
+@pytest.mark.parametrize("step", [0, -1])
+def test_walk_forward_rejects_non_positive_step(step: int) -> None:
+    with pytest.raises(ValueError, match="step"):
+        walk_forward_splits(120, 60, 20, step=step)
+
+
 def test_purged_kfold_removes_neighbours_and_embargo() -> None:
     splits = purged_kfold_splits(20, folds=4, purge=2, embargo=2)
     first = splits[0]
@@ -52,3 +58,5 @@ def test_sensitivity_and_stress_are_explicit() -> None:
     candidate = EqualWeight().solve(sample_problem())
     assert stress_return(candidate, (-0.01, -0.30)) == pytest.approx(-0.155)
     assert stress_volatility(candidate, (0.01, 0.20), 1.0) == pytest.approx(0.105)
+    with pytest.raises(ValueError, match="correlação"):
+        stress_volatility(candidate, (0.01, 0.20), -1.01)

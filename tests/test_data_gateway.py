@@ -61,6 +61,25 @@ def test_sidra_provider_discards_metadata_row_and_preserves_dimensions() -> None
     assert ("D1N", "Brasil") in observations[0].dimensions
 
 
+def test_sidra_latest_preserves_multiple_dimensions_in_the_same_period() -> None:
+    payload = [
+        {"MN": "Número-índice", "V": "Valor"},
+        {"V": "100", "D1C": "1", "D1N": "Brasil", "D3C": "202607"},
+        {"V": "110", "D1C": "35", "D1N": "São Paulo", "D3C": "202607"},
+    ]
+    observations = SidraProvider(FakeTransport(payload)).fetch(
+        SeriesQuery("IPCA", parameters=(("table", "1737"), ("variable", "2266"))), NOW
+    )
+    store = ObservationStore()
+    store.append(observations)
+    latest = store.latest_as_known_at("IPCA", NOW)
+    assert len(latest) == 2
+    assert {dict(item.dimensions)["D1C"] for item in latest} == {"1", "35"}
+    vintage = store.vintage(observations[0].vintage_id, NOW)
+    assert len(vintage.source_hash) == 64
+    assert vintage.source_hash not in {item.observation_id for item in observations}
+
+
 def test_store_is_idempotent_and_point_in_time() -> None:
     observation = BcbSgsProvider(FakeTransport([{"data": "19/08/2026", "valor": "13.90"}])).fetch(
         SeriesQuery("1178"), NOW

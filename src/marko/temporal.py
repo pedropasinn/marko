@@ -31,6 +31,7 @@ class Observation:
     source: str
     times: TimeCoordinates
     vintage_id: str
+    raw_payload_hash: str
     dimensions: tuple[tuple[str, str], ...] = ()
     quality_flags: tuple[str, ...] = ()
 
@@ -41,6 +42,7 @@ class Observation:
             self.unit,
             self.source,
             self.vintage_id,
+            self.raw_payload_hash,
         )
         if any(not value.strip() for value in required):
             raise ValueError("identificadores, unidade, fonte e vintage são obrigatórios")

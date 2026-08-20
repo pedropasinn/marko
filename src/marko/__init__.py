@@ -17,10 +17,10 @@ from marko.data_gateway import (
     SeriesQuery,
     SidraProvider,
 )
-from marko.decision import CashFlowRebalancer, DecisionPacket
+from marko.decision import CashFlowRebalancer, CashTarget, DecisionPacket, ValidatedModelRunRef
 from marko.instruments import AssetClass, Instrument, InstrumentIdentifier
 from marko.ledger import DuplicateActivityError, Ledger
-from marko.liabilities import Liability, LiabilityCashflow, funding_ratio, shortfall
+from marko.liabilities import InterestTerms, Liability, LiabilityCashflow, funding_ratio, shortfall
 from marko.money import CurrencyMismatchError, Money
 from marko.policy import Constraint, ConstraintSet, InvestmentPolicy, Universe, UniverseItem
 from marko.portfolio_lab import (
@@ -31,7 +31,14 @@ from marko.portfolio_lab import (
     RiskBudgeting,
 )
 from marko.reconciliation import BrokerStatement, ReconciliationReport, reconcile
-from marko.snapshots import PortfolioSnapshot, PriceQuote, build_snapshot
+from marko.snapshots import (
+    FxQuote,
+    IncompleteValuationError,
+    PortfolioSnapshot,
+    PriceQuote,
+    ValuationResult,
+    build_snapshot,
+)
 from marko.taxlots import CostBasisMethod, TaxLotReport, build_tax_lots
 from marko.temporal import DataVintage, Observation, TimeCoordinates
 
@@ -45,6 +52,7 @@ __all__ = [
     "BrokerStatement",
     "BusinessCalendar",
     "CashFlowRebalancer",
+    "CashTarget",
     "Constraint",
     "ConstraintSet",
     "CostBasisMethod",
@@ -54,8 +62,11 @@ __all__ = [
     "DecisionPacket",
     "DuplicateActivityError",
     "EqualWeight",
+    "FxQuote",
+    "IncompleteValuationError",
     "Instrument",
     "InstrumentIdentifier",
+    "InterestTerms",
     "InverseVolatility",
     "InvestmentPolicy",
     "Ledger",
@@ -78,6 +89,8 @@ __all__ = [
     "TimeCoordinates",
     "Universe",
     "UniverseItem",
+    "ValidatedModelRunRef",
+    "ValuationResult",
     "build_snapshot",
     "build_tax_lots",
     "funding_ratio",

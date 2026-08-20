@@ -4,20 +4,29 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  quality:
+  quality-gate:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.12"
       - name: Install uv
-        run: python -m pip install uv
+        run: python -m pip install uv==0.11.3
       - name: Install
         run: uv sync --group dev --frozen
       - name: Ruff
@@ -26,3 +35,38 @@ jobs:
         run: uv run mypy
       - name: Tests
         run: uv run pytest --cov=marko --cov-report=term-missing --cov-fail-under=80
+
+  upstream-integration:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install uv==0.11.3
+      - name: Install optional adapters
+        run: uv sync --group dev --extra research --frozen
+      - name: Adapter tests
+        run: uv run --extra research pytest -m optional
+
+  provider-smoke:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install uv==0.11.3
+      - name: Install
+        run: uv sync --frozen
+      - name: BCB SGS smoke
+        run: uv run marko fetch-bcb 1178 --start 2026-08-19 --end 2026-08-19
+      - name: SIDRA smoke
+        run: uv run marko fetch-sidra IPCA --table 1737 --variable 2266 --period "last 1"

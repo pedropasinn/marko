@@ -1,15 +1,21 @@
 [case]
 base_currency = "BRL"
-monthly_contribution = "2000.00"
+monthly_contribution = "1000.00"
 tax_residency = ""
 
 [liability]
-creditor = "Mãe"
-principal = "50000.00"
+creditor = "Credor de exemplo"
+principal = "25000.00"
 originated_on = ""
 maturity_date = ""
-interest_rule = ""
 callable_early = ""
+
+[liability.interest]
+annual_rate = ""
+compounding = ""
+day_count_convention = ""
+payment_frequency = ""
+rounding_rule = ""
 
 [policy]
 minimum_liquidity = ""

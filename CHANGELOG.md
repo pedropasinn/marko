@@ -4,12 +4,23 @@ As mudanças relevantes do Marko serão registradas aqui por versão.
 
 ## [Unreleased]
 
-### Planejado
+### Alterado
 
-- persistência do domínio;
-- regras fiscais brasileiras;
-- shadow portfolio;
-- conectores autenticados.
+- configuração pública substituída por exemplo sintético; caso real passa por `MARKO_CASE_PATH` ou arquivo local ignorado;
+- reversões validadas contra o payload original e refletidas nos lotes fiscais por `as_of`;
+- matriz de campos por `ActivityKind` impede valores monetários sem efeito;
+- moedas desconhecidas são rejeitadas;
+- valuation informa completude, preços/FX ausentes, stale quotes e evidências;
+- SIDRA preserva dimensões concorrentes e vintages usam hash do payload bruto;
+- candidatos pós-validados são tipos próprios e únicos aceitos pela decisão;
+- walk-forward usa pesos após drift e rejeita `step <= 0`;
+- caixa virou entrada explícita do rebalanceador;
+- juros do passivo usam `InterestTerms` estruturado;
+- CI foi dividido em quality gate, adapters opcionais e provider smoke.
+
+### Bloqueado
+
+- persistência e shadow operation até a conclusão da v0.2.1.
 
 ## [0.2.0] — 2026-08-20
 

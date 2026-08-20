@@ -2,7 +2,7 @@
 
 O Marko é desenvolvido em público para que decisões, experimentos, falhas e mudanças arquiteturais possam ser acompanhados.
 
-## Antes de propor código
+## Antes de contribuir
 
 1. abra ou localize uma issue;
 2. descreva o problema, evidência e critério de aceite;
@@ -11,6 +11,8 @@ O Marko é desenvolvido em público para que decisões, experimentos, falhas e m
 5. não apresente resultados como recomendação financeira.
 
 Specs executáveis permanecem em `.scratch/<feature>/`. Issues do GitHub são a superfície pública de acompanhamento.
+
+Enquanto a licença e a política de titularidade não forem definidas, contribuições externas ficam limitadas a issues, discussions, reprodução de bugs e sugestões textuais. PRs externos de código não serão aceitos.
 
 ## Ambiente
 
@@ -33,4 +35,4 @@ Todo PR precisa preservar:
 
 ## Licença
 
-A licença pública ainda não foi definida. O repositório público permite acompanhar e discutir o desenvolvimento, mas não concede implicitamente permissão de uso, modificação ou redistribuição. Issues e sugestões são bem-vindas; PRs de código serão avaliados junto com a futura decisão de licença.
+A licença pública ainda não foi definida. O repositório pode ser visualizado, clonado e bifurcado conforme os termos do GitHub, mas não concede uma licença ampla de uso, modificação ou redistribuição fora dessas condições.
