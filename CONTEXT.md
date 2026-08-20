@@ -15,6 +15,8 @@ Marko é um gestor quantitativo pessoal orientado a passivos. Ele mantém a verd
 - **Data Vintage**: versão reproduzível de um conjunto de observações.
 - **Model Run**: execução imutável com dados, código, ambiente, solver e diagnósticos.
 - **Decision Packet**: alternativas, custos, riscos, evidências e `NO_ACTION`.
+- **Serialization Envelope**: contrato canônico versionado para persistir uma verdade do domínio.
+- **Shadow Run Request**: ciclo virtual agendado com corte explícito de conhecimento.
 
 ## Três verdades
 
@@ -35,3 +37,5 @@ O núcleo contém dinheiro, instrumentos, contas, activities, ledger, passivos, 
 - Aprovação não prova execução; reconciliação fecha o ciclo.
 - Toda decisão inclui a alternativa de não agir.
 - Capital real permanece fora do escopo até satisfazer os gates definidos no roadmap.
+- Persistência é append-only; conflito de identidade nunca é resolvido por sobrescrita.
+- Shadow usa apenas evidência disponível no instante da decisão.

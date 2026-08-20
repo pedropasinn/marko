@@ -24,7 +24,7 @@ def test_policy_carries_liability_and_real_capital_gate() -> None:
         horizon_end=date(2030, 8, 20),
         minimum_liquidity=Money.of("15000", "BRL"),
         maximum_drawdown=Decimal("0.20"),
-        liability_ids=("loan-mother",),
+        liability_ids=("loan-synthetic",),
     )
     assert policy.base_currency == "BRL"
     assert policy.real_capital_enabled is False

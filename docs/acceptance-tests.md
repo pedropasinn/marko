@@ -30,6 +30,11 @@
 - [x] `step <= 0`, candidato incompatível e stress inválido são rejeitados;
 - [x] pesos projetados incluem caixa explícito e somam um;
 - [x] CLI cobre configuração válida e arquivo ausente;
+- [x] codecs versionados fazem round trip das quatro verdades;
+- [x] backup adulterado falha e restore repetido é idempotente;
+- [x] Parquet preserva observações e hash do conteúdo;
+- [x] PostgreSQL detecta conflito e bloqueia UPDATE/DELETE;
+- [x] scheduler shadow é determinístico e reconciliação rejeita evidência futura;
 - [ ] casos dourados de TWR com transferências e múltiplas moedas;
 - [ ] confirmação de broker duplicada é idempotente;
 - [ ] impostos brasileiros por instrumento e prazo.

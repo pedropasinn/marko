@@ -6,7 +6,7 @@ Sim. Eu mudaria a definição do projeto para algo mais ambicioso:
 
 > **Marko não será um programa que “escolhe investimentos”. Será um sistema quantitativo de gestão patrimonial, pesquisa, decisão, risco, execução assistida, contabilidade e auditoria.**
 
-E, como o capital inicial veio de um empréstimo da sua mãe, há uma ideia de finanças que eu colocaria no centro desde o primeiro dia: **Asset-Liability Management**. O Marko não deve enxergar apenas “tenho R$ 50 mil”; ele deve enxergar “tenho R$ 50 mil em ativos e uma obrigação futura de R$ 50 mil — ou o valor contratualmente devido — com determinada data e condições”. Isso muda a maneira correta de medir risco.
+Como o caso sintético possui capital inicial associado a um passivo, há uma ideia de finanças que eu colocaria no centro desde o primeiro dia: **Asset-Liability Management**. O Marko não deve enxergar apenas ativos; ele deve enxergar ativos e uma obrigação futura — ou o valor contratualmente devido — com determinada data e condições. Isso muda a maneira correta de medir risco.
 
 Eu também acrescentaria imediatamente `cvxportfolio` aos repositórios que você pediu para o Codex clonar. Ele cobre uma lacuna importante: custos de transação, restrições e otimização multi-período, e seu simulador foi desenhado para que as decisões do backtest usem apenas informação disponível até cada instante. ([GitHub][1])
 
@@ -103,11 +103,11 @@ Teríamos:
 
 ```text
 ASSETS
-R$ 50.000
+R$ 25.000 sintéticos
 
 LIABILITY
 Empréstimo da mãe
-Principal: R$ 50.000
+Principal: R$ 25.000 sintéticos
 Vencimento: ?
 Juros: ?
 Indexação: ?
@@ -675,7 +675,7 @@ Responde:
 
 > Como a estratégia performou independentemente dos aportes?
 
-Com seus R$ 2 mil entrando mensalmente, essa distinção é essencial.
+Com aportes sintéticos de R$ 1 mil entrando mensalmente, essa distinção é essencial.
 
 Teremos:
 
@@ -1689,7 +1689,7 @@ D  20%      19%
 E  20%      21%
 ```
 
-E entram R$ 2.000.
+E entram R$ 1.000 sintéticos.
 
 O Marko primeiro tenta corrigir com o aporte.
 
@@ -2525,7 +2525,7 @@ Criamos:
 
 ```text
 SHADOW CAPITAL
-R$ 50.000 virtuais
+R$ 25.000 virtuais
 ```
 
 e simulamos exatamente:

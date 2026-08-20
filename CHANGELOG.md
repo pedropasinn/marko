@@ -4,6 +4,29 @@ As mudanças relevantes do Marko serão registradas aqui por versão.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-20
+
+### Adicionado
+
+- portas de repositório e codecs JSON canônicos/versionados;
+- PostgreSQL append-only para Activity, Observation, ModelRun e DecisionPacket;
+- migrações transacionais com advisory lock e checksum;
+- Parquet imutável para datasets de observações;
+- backup, verificação e restore idempotente;
+- scheduler shadow e reconciliação de evidências ponto-no-tempo;
+- casos dourados de TWR com aportes, transferências, FX e corporate actions;
+- comandos de persistência e shadow no CLI;
+- job de integração PostgreSQL 16/Parquet.
+
+### Segurança
+
+- UPDATE e DELETE são bloqueados por triggers;
+- conflito de identidade é detectado por hash;
+- backup adulterado e schema desconhecido falham explicitamente;
+- capital real e broker write adapter permanecem bloqueados.
+
+## [0.2.1] — 2026-08-20
+
 ### Alterado
 
 - configuração pública substituída por exemplo sintético; caso real passa por `MARKO_CASE_PATH` ou arquivo local ignorado;
@@ -17,10 +40,6 @@ As mudanças relevantes do Marko serão registradas aqui por versão.
 - caixa virou entrada explícita do rebalanceador;
 - juros do passivo usam `InterestTerms` estruturado;
 - CI foi dividido em quality gate, adapters opcionais e provider smoke.
-
-### Bloqueado
-
-- persistência e shadow operation até a conclusão da v0.2.1.
 
 ## [0.2.0] — 2026-08-20
 
