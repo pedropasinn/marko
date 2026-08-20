@@ -46,7 +46,14 @@ def test_trade_and_cash_activities_close_exactly() -> None:
             quantity=Decimal("2"),
         )
     )
-    ledger.append(activity("dividend", ActivityKind.DIVIDEND, gross_amount=Money.of("8", "BRL")))
+    ledger.append(
+        activity(
+            "dividend",
+            ActivityKind.DIVIDEND,
+            gross_amount=Money.of("8", "BRL"),
+            instrument_id="ETF",
+        )
+    )
     assert ledger.cash_balance("broker", "BRL") == Money.of("532", "BRL")
     assert ledger.position("broker", "ETF") == Decimal("8")
 
@@ -96,3 +103,50 @@ def test_activity_requires_timezone_and_positive_amount() -> None:
         )
     with pytest.raises(ValueError):
         activity("bad-amount", ActivityKind.FEE, gross_amount=Money.of(0, "BRL"))
+
+
+def test_activity_rejects_fields_without_an_accounting_effect() -> None:
+    with pytest.raises(ValueError, match="não permitidos"):
+        activity(
+            "bad-deposit-fee",
+            ActivityKind.DEPOSIT,
+            gross_amount=Money.of("100", "BRL"),
+            fee=Money.of("1", "BRL"),
+        )
+    withdrawal = activity(
+        "withdrawal",
+        ActivityKind.WITHDRAWAL,
+        gross_amount=Money.of("100", "BRL"),
+        fee=Money.of("2", "BRL"),
+        tax=Money.of("1", "BRL"),
+    )
+    assert withdrawal.cash_effect() == Money.of("-103", "BRL")
+
+
+def test_unpaired_transfer_fails_before_projection() -> None:
+    ledger = Ledger(
+        [
+            activity(
+                "out",
+                ActivityKind.CASH_TRANSFER_OUT,
+                gross_amount=Money.of("100", "BRL"),
+                related_account_id="bank",
+                related_activity_id="missing",
+            )
+        ]
+    )
+    with pytest.raises(ValueError, match="sem par"):
+        ledger.cash_balance("broker", "BRL")
+
+
+def test_fx_charges_are_never_silently_discarded() -> None:
+    conversion = activity(
+        "fx",
+        ActivityKind.FX_CONVERSION,
+        gross_amount=Money.of("500", "BRL"),
+        counter_amount=Money.of("100", "USD"),
+        ratio=Decimal("0.2"),
+        fee=Money.of("2", "BRL"),
+        tax=Money.of("1", "BRL"),
+    )
+    assert conversion.cash_effects() == (Money.of("-503", "BRL"), Money.of("100", "USD"))

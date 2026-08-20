@@ -4,10 +4,16 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marko"
-version = "0.2.0"
+version = "0.2.1"
 description = "Núcleo auditável de um gestor quantitativo pessoal orientado a passivos"
 requires-python = ">=3.12"
 dependencies = ["numpy>=2.0"]
+
+[project.optional-dependencies]
+research = [
+  "PyPortfolioOpt==1.6.0",
+  "skfolio==0.20.2",
+]
 
 [project.scripts]
 marko = "marko.__main__:main"
@@ -26,6 +32,7 @@ packages = ["src/marko"]
 [tool.pytest.ini_options]
 addopts = "--strict-markers --strict-config"
 testpaths = ["tests"]
+markers = ["optional: integração com bibliotecas quantitativas opcionais"]
 
 [tool.ruff]
 line-length = 100
@@ -38,3 +45,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 python_version = "3.12"
 strict = true
 packages = ["marko"]
+
+[[tool.mypy.overrides]]
+module = ["pypfopt.*", "skfolio.*"]
+ignore_missing_imports = true

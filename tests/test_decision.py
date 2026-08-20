@@ -5,6 +5,7 @@ import pytest
 
 from marko.decision import (
     CashFlowRebalancer,
+    CashTarget,
     DecisionAlternative,
     DecisionPacket,
     Holding,
@@ -18,7 +19,6 @@ def holdings() -> tuple[Holding, ...]:
         Holding("BR", Money.of("8500", "BRL"), Money.of("50", "BRL"), True),
         Holding("GLOBAL", Money.of("10500", "BRL"), Money.of("100", "BRL"), True),
         Holding("IPCA", Money.of("7000", "BRL"), Money.of("10", "BRL")),
-        Holding("CASH", Money.of("24000", "BRL"), Money.of("1", "BRL")),
     )
 
 
@@ -27,7 +27,6 @@ def targets() -> tuple[TargetAllocation, ...]:
         TargetAllocation("BR", Decimal("0.15"), Decimal("0.20")),
         TargetAllocation("GLOBAL", Decimal("0.25"), Decimal("0.30")),
         TargetAllocation("IPCA", Decimal("0.15"), Decimal("0.20")),
-        TargetAllocation("CASH", Decimal("0.45"), Decimal("0.60")),
     )
 
 
@@ -39,6 +38,8 @@ def test_cash_flow_rebalancing_uses_contribution_without_sales() -> None:
         policy_version=1,
         holdings=holdings(),
         targets=targets(),
+        cash=Money.of("24000", "BRL"),
+        cash_target=CashTarget(Decimal("0.45"), Decimal("0.60")),
         contribution=Money.of("2000", "BRL"),
     )
     no_action, rebalance = packet.alternatives
@@ -81,9 +82,41 @@ def test_ips_liquidity_can_block_a_draft_without_hiding_it() -> None:
         policy_version=1,
         holdings=holdings(),
         targets=targets(),
+        cash=Money.of("24000", "BRL"),
+        cash_target=CashTarget(Decimal("0.45"), Decimal("0.60")),
         contribution=Money.of("2000", "BRL"),
         minimum_cash=Money.of("25000", "BRL"),
     )
     draft = packet.alternatives[1]
     assert not draft.feasible
     assert "violação de liquidez mínima" in draft.reasons
+
+
+def test_rebalancer_rejects_duplicates_and_zero_wealth() -> None:
+    rebalancer = CashFlowRebalancer()
+    common = {
+        "packet_id": "bad",
+        "created_at": datetime(2026, 8, 20, tzinfo=UTC),
+        "policy_id": "ips",
+        "policy_version": 1,
+        "cash_target": CashTarget(Decimal("0.5"), Decimal(1)),
+        "contribution": Money.zero("BRL"),
+    }
+    duplicate = Holding("ETF", Money.of("10", "BRL"), Money.of("1", "BRL"))
+    with pytest.raises(ValueError, match="duplicados"):
+        rebalancer.build_packet(
+            **common,
+            holdings=(duplicate, duplicate),
+            targets=(
+                TargetAllocation("ETF", Decimal("0.25"), Decimal(1)),
+                TargetAllocation("ETF", Decimal("0.25"), Decimal(1)),
+            ),
+            cash=Money.of("10", "BRL"),
+        )
+    with pytest.raises(ValueError, match="patrimônio total"):
+        rebalancer.build_packet(
+            **common,
+            holdings=(Holding("ETF", Money.zero("BRL"), Money.of("1", "BRL")),),
+            targets=(TargetAllocation("ETF", Decimal("0.5"), Decimal(1)),),
+            cash=Money.zero("BRL"),
+        )

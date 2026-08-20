@@ -93,8 +93,35 @@ def test_cash_attribution_separates_fee_tax_and_income() -> None:
         T0,
         T0,
         Money.of("5", "BRL"),
+        instrument_id="ETF",
     )
     result = cash_attribution(Ledger([trade, dividend]), "BRL")
     assert result.fees == Money.of("1", "BRL")
     assert result.taxes == Money.of("2", "BRL")
     assert result.income == Money.of("5", "BRL")
+
+
+def test_cash_attribution_separates_return_of_capital_and_reversals() -> None:
+    amortization = Activity(
+        "amortization",
+        ActivityKind.AMORTIZATION,
+        "broker",
+        T0,
+        T0,
+        Money.of("10", "BRL"),
+        instrument_id="ETF",
+    )
+    reversal = Activity(
+        "amortization-reversal",
+        ActivityKind.AMORTIZATION,
+        "broker",
+        T0,
+        T0,
+        Money.of("10", "BRL"),
+        instrument_id="ETF",
+        correction_of="amortization",
+        is_reversal=True,
+    )
+    result = cash_attribution(Ledger((amortization, reversal)), "BRL")
+    assert result.return_of_capital == Money.zero("BRL")
+    assert result.income == Money.zero("BRL")

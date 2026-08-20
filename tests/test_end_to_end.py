@@ -3,7 +3,13 @@ from decimal import Decimal
 
 import numpy as np
 
-from marko.decision import CashFlowRebalancer, Holding, TargetAllocation
+from marko.decision import (
+    CashFlowRebalancer,
+    CashTarget,
+    Holding,
+    TargetAllocation,
+    ValidatedModelRunRef,
+)
 from marko.money import Money
 from marko.portfolio_lab import MinimumVariance, PortfolioProblem
 from marko.research_registry import SolverRecord, execute_model_run
@@ -48,6 +54,7 @@ def test_research_result_becomes_auditable_cash_flow_draft() -> None:
         Holding("IPCA", Money.of("10000", "BRL"), Money.of("10", "BRL")),
         Holding("GLOBAL", Money.of("15000", "BRL"), Money.of("100", "BRL"), True),
     )
+    assert run.validated_candidate is not None
     packet = CashFlowRebalancer(Decimal("5")).build_packet(
         packet_id="packet-1",
         created_at=datetime(2026, 8, 20, tzinfo=UTC),
@@ -55,8 +62,10 @@ def test_research_result_becomes_auditable_cash_flow_draft() -> None:
         policy_version=1,
         holdings=holdings,
         targets=targets,
+        cash=Money.zero("BRL"),
+        cash_target=CashTarget(Decimal(0), Decimal(1)),
         contribution=Money.of("2000", "BRL"),
-        model_run_ids=(run.run_id,),
+        model_runs=(ValidatedModelRunRef(run.run_id, run.validated_candidate),),
     )
     assert packet.model_run_ids == (run.run_id,)
     assert {alternative.alternative_id for alternative in packet.alternatives} == {

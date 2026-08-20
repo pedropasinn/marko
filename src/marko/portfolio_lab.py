@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import Protocol
 
 import numpy as np
@@ -26,9 +27,17 @@ class PortfolioProblem:
         for vector in (self.current_weights, self.minimum_weights, self.maximum_weights):
             if vector and len(vector) != len(self.assets):
                 raise ValueError("vetor de pesos incompatível")
+            if vector and not np.isfinite(np.asarray(vector)).all():
+                raise ValueError("vetor de pesos precisa ser finito")
         lower, upper = self.bounds()
         if np.any(lower > upper) or lower.sum() > 1 + 1e-12 or upper.sum() < 1 - 1e-12:
             raise ValueError("bounds inviáveis")
+        if self.current_weights:
+            current = np.asarray(self.current_weights)
+            if abs(float(current.sum()) - 1) > 1e-7:
+                raise ValueError("pesos atuais precisam somar um")
+            if np.any(current < lower - 1e-7) or np.any(current > upper + 1e-7):
+                raise ValueError("pesos atuais violam bounds")
 
     def matrix(self) -> npt.NDArray[np.float64]:
         return np.asarray(self.returns, dtype=float)
@@ -50,6 +59,23 @@ class PortfolioCandidate:
     solver_status: str
     diagnostics: tuple[tuple[str, str], ...] = ()
 
+    def __post_init__(self) -> None:
+        if (
+            not self.model_id.strip()
+            or not self.assets
+            or len(set(self.assets)) != len(self.assets)
+        ):
+            raise ValueError("candidato exige modelo e assets únicos")
+        if len(self.assets) != len(self.weights):
+            raise ValueError("assets e weights incompatíveis")
+        values = (*self.weights, self.expected_return, self.volatility)
+        if not all(isfinite(value) for value in values):
+            raise ValueError("candidato contém valor não finito")
+        if self.volatility < 0:
+            raise ValueError("volatilidade não pode ser negativa")
+        if not self.solver_status.strip():
+            raise ValueError("solver_status é obrigatório")
+
     def weight_map(self) -> dict[str, float]:
         return dict(zip(self.assets, self.weights, strict=True))
 
@@ -58,6 +84,17 @@ class PortfolioModel(Protocol):
     model_id: str
 
     def solve(self, problem: PortfolioProblem) -> PortfolioCandidate: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ValidatedPortfolioCandidate:
+    candidate: PortfolioCandidate
+    problem: PortfolioProblem
+
+    def __post_init__(self) -> None:
+        violations = check_candidate(self.candidate, self.problem)
+        if violations:
+            raise ValueError("candidato rejeitado: " + ", ".join(violations))
 
 
 class NoAction:
@@ -161,8 +198,8 @@ class SkfolioMinimumVarianceAdapter:
 
     def solve(self, problem: PortfolioProblem) -> PortfolioCandidate:
         try:
-            from skfolio import RiskMeasure  # type: ignore[import-not-found]
-            from skfolio.optimization import (  # type: ignore[import-not-found]
+            from skfolio import RiskMeasure
+            from skfolio.optimization import (
                 MeanRisk,
                 ObjectiveFunction,
             )
@@ -183,7 +220,7 @@ class PyPortfolioOptMinimumVarianceAdapter:
 
     def solve(self, problem: PortfolioProblem) -> PortfolioCandidate:
         try:
-            from pypfopt import EfficientFrontier  # type: ignore[import-not-found]
+            from pypfopt import EfficientFrontier
         except ImportError as error:
             raise RuntimeError("instale o extra de pesquisa PyPortfolioOpt") from error
         lower, upper = problem.bounds()
@@ -202,6 +239,10 @@ def check_candidate(
     weights = np.asarray(candidate.weights)
     lower, upper = problem.bounds()
     violations = []
+    if candidate.assets != problem.assets:
+        violations.append("asset_order")
+    if len(candidate.weights) != len(problem.assets):
+        return tuple((*violations, "weight_dimension"))
     if not np.isfinite(weights).all():
         violations.append("non_finite_weights")
     if abs(float(weights.sum()) - 1) > tolerance:
@@ -211,6 +252,17 @@ def check_candidate(
     if np.any(weights > upper + tolerance):
         violations.append("maximum_weight")
     return tuple(violations)
+
+
+def validate_candidate(
+    candidate: PortfolioCandidate,
+    problem: PortfolioProblem,
+    tolerance: float = 1e-7,
+) -> ValidatedPortfolioCandidate:
+    violations = check_candidate(candidate, problem, tolerance)
+    if violations:
+        raise ValueError("candidato rejeitado: " + ", ".join(violations))
+    return ValidatedPortfolioCandidate(candidate, problem)
 
 
 def _candidate(

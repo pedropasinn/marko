@@ -7,7 +7,15 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from marko.liabilities import Liability, LiabilityCashflow
+from marko.liabilities import (
+    Compounding,
+    DayCountConvention,
+    InterestRounding,
+    InterestTerms,
+    Liability,
+    LiabilityCashflow,
+    PaymentFrequency,
+)
 from marko.money import Money, decimal_value
 from marko.policy import InvestmentPolicy, Universe, UniverseItem
 
@@ -20,7 +28,7 @@ class PersonalCase:
     monthly_contribution: Money
     originated_on: date | None
     maturity_date: date | None
-    interest_rule: str | None
+    interest_terms: InterestTerms | None
     callable_early: bool | None
     minimum_liquidity: Money | None
     maximum_drawdown: Decimal | None
@@ -45,7 +53,7 @@ class PersonalCase:
         required = {
             "originated_on": self.originated_on,
             "maturity_date": self.maturity_date,
-            "interest_rule": self.interest_rule,
+            "interest_terms": self.interest_terms,
             "callable_early": self.callable_early,
             "minimum_liquidity": self.minimum_liquidity,
             "maximum_drawdown": self.maximum_drawdown,
@@ -56,8 +64,6 @@ class PersonalCase:
             issues.append("campo ausente: brokers")
         if not self.available_instruments:
             issues.append("campo ausente: available_instruments")
-        if self.interest_rule is not None and not _valid_interest_rule(self.interest_rule):
-            issues.append("interest_rule ainda não é calculável; use none ou fixed:<taxa_anual>")
         if (
             self.originated_on is not None
             and self.maturity_date is not None
@@ -85,7 +91,7 @@ class PersonalCase:
                     "family-loan-principal",
                     self.maturity_date,
                     amount_due,
-                    f"Principal; regra: {self.interest_rule}",
+                    "Principal e juros conforme InterestTerms",
                 ),
             ),
             callable_early=self.callable_early,
@@ -126,14 +132,10 @@ class PersonalCase:
     def _amount_due(self) -> Money:
         assert self.originated_on is not None
         assert self.maturity_date is not None
-        assert self.interest_rule is not None
-        if self.interest_rule == "none":
-            return self.principal
-        _, raw_rate = self.interest_rule.split(":", maxsplit=1)
-        annual_rate = decimal_value(raw_rate)
-        years = Decimal((self.maturity_date - self.originated_on).days) / Decimal(365)
-        factor = Decimal(str((1 + float(annual_rate)) ** float(years)))
-        return self.principal * factor
+        assert self.interest_terms is not None
+        return self.interest_terms.amount_due(
+            self.principal, self.originated_on, self.maturity_date
+        )
 
 
 def load_case(path: str | Path) -> PersonalCase:
@@ -141,6 +143,7 @@ def load_case(path: str | Path) -> PersonalCase:
         document = tomllib.load(source)
     case = _mapping(document, "case")
     liability = _mapping(document, "liability")
+    interest = _optional_mapping(liability, "interest")
     policy = _mapping(document, "policy")
     access = _mapping(document, "access")
     currency = str(case.get("base_currency", "BRL"))
@@ -151,7 +154,7 @@ def load_case(path: str | Path) -> PersonalCase:
         monthly_contribution=Money.of(str(case["monthly_contribution"]), currency),
         originated_on=_optional_date(liability.get("originated_on")),
         maturity_date=_optional_date(liability.get("maturity_date")),
-        interest_rule=_optional_text(liability.get("interest_rule")),
+        interest_terms=_optional_interest_terms(interest),
         callable_early=_optional_bool(liability.get("callable_early")),
         minimum_liquidity=_optional_money(policy.get("minimum_liquidity"), currency),
         maximum_drawdown=_optional_decimal(policy.get("maximum_drawdown")),
@@ -203,12 +206,32 @@ def _optional_decimal(value: object) -> Decimal | None:
     return decimal_value(text) if text else None
 
 
-def _valid_interest_rule(rule: str) -> bool:
-    if rule == "none":
-        return True
-    if not rule.startswith("fixed:"):
-        return False
-    try:
-        return decimal_value(rule.split(":", maxsplit=1)[1]) > Decimal(-1)
-    except ValueError:
-        return False
+def _optional_mapping(document: dict[str, Any], key: str) -> dict[str, Any] | None:
+    value = document.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"seção TOML inválida: {key}")
+    return value
+
+
+def _optional_interest_terms(document: dict[str, Any] | None) -> InterestTerms | None:
+    if document is None or not any(_optional_text(value) for value in document.values()):
+        return None
+    required = (
+        "annual_rate",
+        "compounding",
+        "day_count_convention",
+        "payment_frequency",
+        "rounding_rule",
+    )
+    missing = [key for key in required if not _optional_text(document.get(key))]
+    if missing:
+        raise ValueError("termos de juros incompletos: " + ", ".join(missing))
+    return InterestTerms(
+        decimal_value(str(document["annual_rate"])),
+        Compounding(str(document["compounding"])),
+        DayCountConvention(str(document["day_count_convention"])),
+        PaymentFrequency(str(document["payment_frequency"])),
+        InterestRounding(str(document["rounding_rule"])),
+    )

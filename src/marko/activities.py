@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
@@ -52,6 +52,84 @@ _CASH_KINDS = {
     ActivityKind.AMORTIZATION,
 }
 
+_ACTIVITY_FIELDS = {
+    ActivityKind.DEPOSIT: frozenset({"gross_amount"}),
+    ActivityKind.WITHDRAWAL: frozenset({"gross_amount", "fee", "tax"}),
+    ActivityKind.BUY: frozenset({"gross_amount", "instrument_id", "quantity", "fee", "tax"}),
+    ActivityKind.SELL: frozenset({"gross_amount", "instrument_id", "quantity", "fee", "tax"}),
+    ActivityKind.DIVIDEND: frozenset({"gross_amount", "instrument_id", "fee", "tax"}),
+    ActivityKind.INTEREST: frozenset({"gross_amount", "instrument_id", "fee", "tax"}),
+    ActivityKind.FEE: frozenset({"gross_amount"}),
+    ActivityKind.TAX: frozenset({"gross_amount"}),
+    ActivityKind.DELIVERY_IN: frozenset({"instrument_id", "quantity", "cost_basis"}),
+    ActivityKind.DELIVERY_OUT: frozenset({"instrument_id", "quantity"}),
+    ActivityKind.CASH_TRANSFER_IN: frozenset(
+        {"gross_amount", "fee", "tax", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.CASH_TRANSFER_OUT: frozenset(
+        {"gross_amount", "fee", "tax", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.POSITION_TRANSFER_IN: frozenset(
+        {"instrument_id", "quantity", "cost_basis", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.POSITION_TRANSFER_OUT: frozenset(
+        {"instrument_id", "quantity", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.FX_CONVERSION: frozenset(
+        {"gross_amount", "counter_amount", "ratio", "fee", "tax"}
+    ),
+    ActivityKind.SPLIT: frozenset({"instrument_id", "ratio"}),
+    ActivityKind.SPINOFF: frozenset(
+        {"instrument_id", "quantity", "cost_basis", "related_instrument_id"}
+    ),
+    ActivityKind.AMORTIZATION: frozenset({"gross_amount", "instrument_id", "fee", "tax"}),
+}
+
+_PAYLOAD_FIELDS = frozenset(
+    {
+        "gross_amount",
+        "instrument_id",
+        "quantity",
+        "fee",
+        "tax",
+        "cost_basis",
+        "counter_amount",
+        "related_account_id",
+        "related_activity_id",
+        "related_instrument_id",
+        "ratio",
+    }
+)
+
+_REQUIRED_FIELDS = {
+    ActivityKind.DEPOSIT: frozenset({"gross_amount"}),
+    ActivityKind.WITHDRAWAL: frozenset({"gross_amount"}),
+    ActivityKind.BUY: frozenset({"gross_amount", "instrument_id", "quantity"}),
+    ActivityKind.SELL: frozenset({"gross_amount", "instrument_id", "quantity"}),
+    ActivityKind.DIVIDEND: frozenset({"gross_amount", "instrument_id"}),
+    ActivityKind.INTEREST: frozenset({"gross_amount"}),
+    ActivityKind.FEE: frozenset({"gross_amount"}),
+    ActivityKind.TAX: frozenset({"gross_amount"}),
+    ActivityKind.DELIVERY_IN: frozenset({"instrument_id", "quantity"}),
+    ActivityKind.DELIVERY_OUT: frozenset({"instrument_id", "quantity"}),
+    ActivityKind.CASH_TRANSFER_IN: frozenset(
+        {"gross_amount", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.CASH_TRANSFER_OUT: frozenset(
+        {"gross_amount", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.POSITION_TRANSFER_IN: frozenset(
+        {"instrument_id", "quantity", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.POSITION_TRANSFER_OUT: frozenset(
+        {"instrument_id", "quantity", "related_account_id", "related_activity_id"}
+    ),
+    ActivityKind.FX_CONVERSION: frozenset({"gross_amount", "counter_amount", "ratio"}),
+    ActivityKind.SPLIT: frozenset({"instrument_id", "ratio"}),
+    ActivityKind.SPINOFF: frozenset({"instrument_id", "quantity", "related_instrument_id"}),
+    ActivityKind.AMORTIZATION: frozenset({"gross_amount", "instrument_id"}),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class Activity:
@@ -85,6 +163,30 @@ class Activity:
             raise ValueError("timestamps de activity precisam de timezone")
         if self.recorded_at < self.effective_at:
             raise ValueError("recorded_at não pode preceder effective_at")
+        populated = {
+            field.name
+            for field in fields(self)
+            if field.name in _PAYLOAD_FIELDS and getattr(self, field.name) is not None
+        }
+        forbidden = populated - _ACTIVITY_FIELDS[self.kind]
+        if forbidden:
+            raise ValueError(
+                f"campos não permitidos para {self.kind.value}: {', '.join(sorted(forbidden))}"
+            )
+        missing = _REQUIRED_FIELDS[self.kind] - populated
+        if missing:
+            raise ValueError(
+                f"campos obrigatórios para {self.kind.value}: {', '.join(sorted(missing))}"
+            )
+        for name in (
+            "instrument_id",
+            "related_account_id",
+            "related_activity_id",
+            "related_instrument_id",
+        ):
+            value = getattr(self, name)
+            if value is not None and not value.strip():
+                raise ValueError(f"{name} não pode ser vazio")
         if self.quantity is not None:
             object.__setattr__(self, "quantity", decimal_value(self.quantity))
         if self.ratio is not None:
@@ -147,6 +249,8 @@ class Activity:
             raise ValueError("spinoff exige o instrumento de origem")
         if self.is_reversal and not self.correction_of:
             raise ValueError("reversal exige correction_of")
+        if self.correction_of and not self.is_reversal:
+            raise ValueError("correction_of exige uma activity de reversão")
 
     def cash_effect(self) -> Money | None:
         effects = self.cash_effects()
@@ -157,7 +261,9 @@ class Activity:
             return ()
         if self.kind is ActivityKind.FX_CONVERSION:
             assert self.counter_amount is not None
-            effects = (-self.gross_amount, self.counter_amount)
+            fee = self.fee or Money.zero(self.gross_amount.currency)
+            tax = self.tax or Money.zero(self.gross_amount.currency)
+            effects = (-(self.gross_amount + fee + tax), self.counter_amount)
             return tuple(-effect for effect in effects) if self.is_reversal else effects
         fee = self.fee or Money.zero(self.gross_amount.currency)
         tax = self.tax or Money.zero(self.gross_amount.currency)
@@ -173,8 +279,15 @@ class Activity:
         elif self.kind is ActivityKind.BUY:
             effect = -(self.gross_amount + fee + tax)
         else:
-            effect = -self.gross_amount
+            effect = -(self.gross_amount + fee + tax)
         return (-effect,) if self.is_reversal else (effect,)
+
+    def reversal_payload(self) -> tuple[object, ...]:
+        return (
+            self.kind,
+            self.account_id,
+            *(getattr(self, name) for name in sorted(_PAYLOAD_FIELDS)),
+        )
 
     def position_effect(self) -> Decimal:
         if self.quantity is None:

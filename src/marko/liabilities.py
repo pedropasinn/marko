@@ -2,9 +2,57 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
+from enum import StrEnum
 
 from marko.money import CurrencyMismatchError, Money
+
+
+class Compounding(StrEnum):
+    NONE = "none"
+    SIMPLE = "simple"
+    ANNUAL = "annual"
+
+
+class DayCountConvention(StrEnum):
+    ACTUAL_365 = "actual/365"
+
+
+class PaymentFrequency(StrEnum):
+    AT_MATURITY = "at_maturity"
+
+
+class InterestRounding(StrEnum):
+    HALF_EVEN = "half_even"
+
+
+@dataclass(frozen=True, slots=True)
+class InterestTerms:
+    annual_rate: Decimal
+    compounding: Compounding
+    day_count_convention: DayCountConvention
+    payment_frequency: PaymentFrequency
+    rounding_rule: InterestRounding
+
+    def __post_init__(self) -> None:
+        rate = Decimal(str(self.annual_rate))
+        if not rate.is_finite() or rate <= Decimal(-1):
+            raise ValueError("annual_rate inválida")
+        if self.compounding is Compounding.NONE and rate != 0:
+            raise ValueError("compounding none exige taxa zero")
+        object.__setattr__(self, "annual_rate", rate)
+
+    def amount_due(self, principal: Money, originated_on: date, maturity_date: date) -> Money:
+        days = Decimal((maturity_date - originated_on).days)
+        years = days / Decimal(365)
+        if self.compounding is Compounding.NONE:
+            factor = Decimal(1)
+        elif self.compounding is Compounding.SIMPLE:
+            factor = Decimal(1) + self.annual_rate * years
+        else:
+            factor = (Decimal(1) + self.annual_rate) ** years
+        amount = (principal.amount * factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN)
+        return Money.of(amount, principal.currency)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,9 +117,14 @@ def shortfall(assets: Money, obligation: Money) -> Money:
 
 
 __all__ = [
+    "Compounding",
     "CurrencyMismatchError",
+    "DayCountConvention",
+    "InterestRounding",
+    "InterestTerms",
     "Liability",
     "LiabilityCashflow",
+    "PaymentFrequency",
     "funding_ratio",
     "shortfall",
 ]

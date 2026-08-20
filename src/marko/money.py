@@ -4,7 +4,22 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from typing import Self
 
-_MINOR_UNITS = {"BRL": 2, "USD": 2, "EUR": 2, "JPY": 0}
+_MINOR_UNITS = {
+    "BRL": 2,
+    "USD": 2,
+    "EUR": 2,
+    "GBP": 2,
+    "CHF": 2,
+    "CAD": 2,
+    "AUD": 2,
+    "CNY": 2,
+    "JPY": 0,
+    "KRW": 0,
+    "CLP": 0,
+    "KWD": 3,
+    "BHD": 3,
+    "JOD": 3,
+}
 
 
 class CurrencyMismatchError(ValueError):
@@ -28,9 +43,9 @@ class Money:
 
     def __post_init__(self) -> None:
         currency = self.currency.upper()
-        if len(currency) != 3 or not currency.isalpha():
-            raise ValueError("a moeda deve usar um código alfabético de três letras")
-        digits = _MINOR_UNITS.get(currency, 2)
+        if currency not in _MINOR_UNITS:
+            raise ValueError(f"moeda não cadastrada: {currency}")
+        digits = _MINOR_UNITS[currency]
         quantum = Decimal(1).scaleb(-digits)
         amount = decimal_value(self.amount).quantize(quantum, rounding=ROUND_HALF_EVEN)
         object.__setattr__(self, "currency", currency)

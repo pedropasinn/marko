@@ -11,7 +11,9 @@ from marko.portfolio_lab import (
     PortfolioCandidate,
     PortfolioModel,
     PortfolioProblem,
+    ValidatedPortfolioCandidate,
     check_candidate,
+    validate_candidate,
 )
 
 
@@ -55,6 +57,7 @@ class ModelRun:
     random_seed: int
     solver: SolverRecord
     candidate: PortfolioCandidate
+    validated_candidate: ValidatedPortfolioCandidate | None
     violations: tuple[str, ...]
 
 
@@ -95,8 +98,13 @@ def execute_model_run(
 ) -> ModelRun:
     if created_at.tzinfo is None:
         raise ValueError("created_at precisa de timezone")
+    canonical_parameters = tuple(sorted(parameters))
+    if len({key for key, _ in canonical_parameters}) != len(canonical_parameters):
+        raise ValueError("parâmetros duplicados")
     candidate = model.solve(problem)
     violations = check_candidate(candidate, problem)
+    validated = validate_candidate(candidate, problem) if not violations else None
+    environment = environment_fingerprint()
     identity = {
         "created_at": created_at.isoformat(),
         "model": candidate.model_id,
@@ -104,9 +112,11 @@ def execute_model_run(
         "dataset": dataset_fingerprint,
         "policy": [policy_id, policy_version],
         "universe": [universe_id, universe_version],
-        "parameters": parameters,
+        "parameters": canonical_parameters,
         "seed": random_seed,
         "solver": asdict(solver),
+        "environment": environment,
+        "candidate": asdict(candidate),
     }
     run_id = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     return ModelRun(
@@ -114,16 +124,17 @@ def execute_model_run(
         created_at,
         candidate.model_id,
         code_version,
-        environment_fingerprint(),
+        environment,
         dataset_fingerprint,
         policy_id,
         policy_version,
         universe_id,
         universe_version,
-        parameters,
+        canonical_parameters,
         random_seed,
         solver,
         candidate,
+        validated,
         violations,
     )
 

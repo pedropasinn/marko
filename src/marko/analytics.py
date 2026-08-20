@@ -133,27 +133,37 @@ class CashAttribution:
     fees: Money
     taxes: Money
     income: Money
+    return_of_capital: Money
+    adjustments: Money
 
 
 def cash_attribution(ledger: Ledger, currency: str) -> CashAttribution:
     fees = Money.zero(currency)
     taxes = Money.zero(currency)
     income = Money.zero(currency)
+    return_of_capital = Money.zero(currency)
+    adjustments = Money.zero(currency)
     for activity in ledger.activities():
+        sign = Decimal(-1) if activity.is_reversal else Decimal(1)
         if activity.fee is not None and activity.fee.currency == currency:
-            fees += activity.fee
+            fees += activity.fee * sign
         if activity.tax is not None and activity.tax.currency == currency:
-            taxes += activity.tax
+            taxes += activity.tax * sign
         if activity.gross_amount is None or activity.gross_amount.currency != currency:
             continue
         if activity.kind is ActivityKind.FEE:
-            fees += activity.gross_amount
+            fees += activity.gross_amount * sign
         elif activity.kind is ActivityKind.TAX:
-            taxes += activity.gross_amount
+            taxes += activity.gross_amount * sign
         elif activity.kind in {
             ActivityKind.DIVIDEND,
             ActivityKind.INTEREST,
-            ActivityKind.AMORTIZATION,
         }:
-            income += activity.gross_amount
-    return CashAttribution(fees, taxes, income)
+            income += activity.gross_amount * sign
+        elif activity.kind is ActivityKind.AMORTIZATION:
+            return_of_capital += activity.gross_amount * sign
+        elif activity.kind is ActivityKind.DEPOSIT:
+            adjustments += activity.gross_amount * sign
+        elif activity.kind is ActivityKind.WITHDRAWAL:
+            adjustments -= activity.gross_amount * sign
+    return CashAttribution(fees, taxes, income, return_of_capital, adjustments)

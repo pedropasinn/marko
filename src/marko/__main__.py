@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -10,12 +12,12 @@ from marko.data_gateway import BcbSgsProvider, SeriesQuery, SidraProvider
 from marko.temporal import Observation
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="marko")
     commands = parser.add_subparsers(dest="command", required=True)
 
     status = commands.add_parser("status", help="valida a configuração do caso pessoal")
-    status.add_argument("--case", type=Path, default=Path("config/personal-case.toml"))
+    status.add_argument("--case", type=Path)
 
     bcb = commands.add_parser("fetch-bcb", help="consulta uma série BCB/SGS")
     bcb.add_argument("series")
@@ -29,29 +31,47 @@ def main() -> None:
     sidra.add_argument("--variable", required=True)
     sidra.add_argument("--period", default="last 1")
 
-    arguments = parser.parse_args()
-    if arguments.command == "status":
-        case = load_case(arguments.case)
-        issues = case.readiness_issues()
-        _print({"ready": not issues, "issues": issues})
-    elif arguments.command == "fetch-bcb":
-        query = SeriesQuery(
-            arguments.series,
-            arguments.start,
-            arguments.end,
-            (("unit", arguments.unit),),
-        )
-        _print_observations(BcbSgsProvider().fetch(query, datetime.now(UTC)))
-    else:
-        query = SeriesQuery(
-            arguments.series,
-            parameters=(
-                ("table", arguments.table),
-                ("variable", arguments.variable),
-                ("period", arguments.period),
-            ),
-        )
-        _print_observations(SidraProvider().fetch(query, datetime.now(UTC)))
+    arguments = parser.parse_args(argv)
+    try:
+        if arguments.command == "status":
+            case_path = _case_path(arguments.case)
+            case = load_case(case_path)
+            issues = case.readiness_issues()
+            _print({"ready": not issues, "issues": issues, "case_path": str(case_path)})
+        elif arguments.command == "fetch-bcb":
+            query = SeriesQuery(
+                arguments.series,
+                arguments.start,
+                arguments.end,
+                (("unit", arguments.unit),),
+            )
+            _print_observations(BcbSgsProvider().fetch(query, datetime.now(UTC)))
+        else:
+            query = SeriesQuery(
+                arguments.series,
+                parameters=(
+                    ("table", arguments.table),
+                    ("variable", arguments.variable),
+                    ("period", arguments.period),
+                ),
+            )
+            _print_observations(SidraProvider().fetch(query, datetime.now(UTC)))
+    except (OSError, ValueError, RuntimeError) as error:
+        print(json.dumps({"error": str(error)}, ensure_ascii=False), file=sys.stderr)
+        return 2
+    return 0
+
+
+def _case_path(explicit: Path | None) -> Path:
+    if explicit is not None:
+        return explicit
+    configured = os.environ.get("MARKO_CASE_PATH")
+    if configured:
+        return Path(configured)
+    local = Path("config/personal-case.local.toml")
+    if local.exists():
+        return local
+    return Path("config/personal-case.example.toml")
 
 
 def _print_observations(observations: tuple[Observation, ...]) -> None:
@@ -76,4 +96,4 @@ def _print(value: object) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

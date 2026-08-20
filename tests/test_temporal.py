@@ -13,7 +13,14 @@ def test_four_times_and_observation_are_point_in_time_explicit() -> None:
         T0, T0 + timedelta(minutes=1), T0 + timedelta(minutes=2), T0 + timedelta(minutes=3)
     )
     observation = Observation(
-        "obs-1", "BCB/SELIC", Decimal("0.14"), "ratio/year", "BCB", times, "v1"
+        "obs-1",
+        "BCB/SELIC",
+        Decimal("0.14"),
+        "ratio/year",
+        "BCB",
+        times,
+        "v1",
+        "sha256:raw",
     )
     assert observation.value == Decimal("0.14")
 

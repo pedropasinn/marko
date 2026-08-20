@@ -25,3 +25,9 @@ def test_money_rejects_cross_currency_arithmetic() -> None:
 def test_money_rejects_non_finite_values(value: str) -> None:
     with pytest.raises(ValueError):
         Money.of(value, "BRL")
+
+
+def test_money_rejects_unregistered_currency_and_respects_three_decimals() -> None:
+    with pytest.raises(ValueError, match="não cadastrada"):
+        Money.of("1", "XYZ")
+    assert Money.of("1.2345", "KWD").amount == Decimal("1.234")

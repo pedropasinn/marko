@@ -7,7 +7,8 @@
 - Tesouro Direto: adapter JSON com endpoint injetado;
 - ANBIMA e B3: adapters autenticados com endpoint/schema injetados;
 - calendário de dias úteis;
-- store idempotente, leitura `as_known_at`, revisão mais recente e Data Vintage.
+- store idempotente, leitura `as_known_at`, revisão por período e dimensões e Data Vintage;
+- hash do payload bruto para auditoria de mudanças no parser.
 
 BCB e SIDRA foram exercitados contra os endpoints oficiais em 20/08/2026. Como as respostas consultadas não informam o instante histórico de publicação, o adapter usa a ingestão como disponibilidade conservadora e marca `availability_conservative`.
 
