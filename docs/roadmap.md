@@ -1,55 +1,35 @@
 # Roadmap canônico
 
-## 0.1 — Accounting e Policy kernel
+Versões descrevem entregas do software. Gates descrevem capacidades e permanecem estáveis mesmo quando várias delas avançam na mesma release.
 
-Estado: implementado.
+## Versões
 
-Dinheiro exato, Instrument Master, contas, activities, ledger, snapshots básicos, Liability, IPS, Universe, Constraints, quatro tempos e invariantes.
+### v0.2.1 — Integrity Hardening
 
-Gate: casos contábeis determinísticos, duplicatas rejeitadas, moeda incompatível rejeitada e shortfall calculável.
+Estado: em desenvolvimento. Bloqueia persistência.
 
-## 0.2 — Analytics e reconciliação
+Fronteira público/privado, reversões e lotes, activity matrix, valuation completo, proveniência bruta, validação de candidatos, drift walk-forward, caixa explícito, termos de juros estruturados, CLI e CI em camadas.
 
-Estado: implementado no corte inicial; corporate actions complexas e regras fiscais brasileiras ainda exigem casos dourados.
+### v0.3.0 — Persistence and Shadow Readiness
 
-TWR, XIRR, drawdown, volatilidade, contribuições, FX, corporate actions, tax lots e importação/reconciliação.
+Portas de repositório, contratos de serialização versionados, PostgreSQL operacional, Parquet de pesquisa, migrações, round trips, idempotência, backup/restore, scheduler shadow e reconciliação.
 
-## 0.3 — Data Gateway
+Só começa quando os invariantes da v0.2.1 estiverem concluídos.
 
-Estado: BCB/SGS e IBGE/SIDRA operacionais; contratos de Tesouro, ANBIMA e B3 aguardam endpoint/credenciais atuais.
+## Gates de capacidade
 
-Providers brasileiros, proveniência, qualidade, calendário, point-in-time, revisão e Data Vintage.
-
-## 0.4 — Baseline Portfolio Lab
-
-Estado: implementado com motores internos e adapters opcionais.
-
-`NO_ACTION`, 1/N, inverse volatility, minimum variance, risk budgeting e adapters skfolio/PyPortfolioOpt.
-
-## 0.5 — Validation Framework
-
-Estado: implementado no corte inicial.
-
-Walk-forward, purge/embargo, custos, benchmarks, estabilidade, stress, sensibilidade e registry de experimentos/solvers.
-
-## 0.6 — Advanced Portfolio Lab
-
-Black–Litterman, HRP/HERC/NCO, CVaR/CDaR, maximum diversification, DRO e ensemble. Nenhum modelo avança sem superar os gates de 0.5.
-
-## 0.7 — Decision e Implementation
-
-Estado: `NO_ACTION` e cash-flow rebalancing implementados como draft; vendas, imposto e execução permanecem futuros.
-
-Model committee, DecisionPacket, cash-flow rebalancing, impostos, turnover, lotes inteiros, draft/approve/record e explicações.
-
-## 0.8 — Macro, fundamentos e research agents
-
-Evidências viram features/views com confiança; nunca ordens diretas.
-
-## 0.9 — Shadow operation
-
-Carteira virtual paralela, CDI/1-N/carteira real como benchmarks e reconciliação diária.
+| Gate | Capacidade | Estado |
+|---|---|---|
+| G1 | Accounting | endurecimento v0.2.1 em curso |
+| G2 | Analytics | corte inicial implementado |
+| G3 | Data | BCB/SGS e SIDRA operacionais; demais pendentes |
+| G4 | Baselines | implementado |
+| G5 | Validation | endurecimento v0.2.1 em curso |
+| G6 | Advanced Models | não iniciado |
+| G7 | Decision | draft por aporte; endurecimento v0.2.1 em curso |
+| G8 | Research Agents | não iniciado |
+| G9 | Shadow | não iniciado |
 
 ## Gate para capital real
 
-Accounting reconciliado, dados PIT, testes anti-look-ahead, robustez, limites de risco, execução simulada, auditoria, shadow por período suficiente, revisão humana e definição formal do empréstimo. Tempo curto de shadow valida operação, não retorno esperado.
+Accounting reconciliado, dados PIT completos, testes anti-look-ahead, limites de risco, execução simulada, auditoria, shadow por período suficiente, revisão humana e definição formal do empréstimo. Tempo curto de shadow valida operação, não retorno esperado.

@@ -28,6 +28,7 @@ uv run marko fetch-sidra IPCA --table 1737 --variable 2266 --period "last 1"
 - [Arquitetura](docs/architecture.md)
 - [Roadmap](docs/roadmap.md)
 - [Invariantes](docs/invariants.md)
+- [Classificação e fronteira de dados](docs/data-classification.md)
 - [Accounting](docs/accounting.md)
 - [Data Gateway](docs/data-gateway.md)
 - [Portfolio Lab](docs/portfolio-lab.md)
@@ -36,3 +37,5 @@ uv run marko fetch-sidra IPCA --table 1737 --variable 2266 --period "last 1"
 - [Spikes quantitativos](research/spikes/README.md)
 
 Os snapshots dos projetos estudados ficam em `/home/pedro/repo/marko-references` e são fixados por [`upstreams.lock.json`](upstreams.lock.json).
+
+Dados pessoais e financeiros reais não pertencem ao repositório. Use `MARKO_CASE_PATH` ou `config/personal-case.local.toml`; o arquivo versionado é apenas um exemplo sintético.

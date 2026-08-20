@@ -1,6 +1,6 @@
 # Estado do Marko
 
-Atualizado em 20/08/2026. Versão: `0.2.0`.
+Atualizado em 20/08/2026. Versão em desenvolvimento: `0.2.1`.
 
 ## Em uma frase
 
@@ -11,32 +11,33 @@ O Marko já possui um núcleo auditável que transforma fatos contábeis, dados 
 | Gate | Estado | Evidência |
 |---|---|---|
 | Arqueologia open source | concluído | 11 auditorias, lockfile e 8 spikes |
-| Accounting kernel | concluído | dinheiro exato, ledger e 55 testes integrados |
-| Analytics e reconciliação | concluído no corte inicial | XIRR golden, TWR, drawdown, snapshots e lotes |
+| Accounting kernel | endurecimento em curso | reversões derivadas, activity matrix e lotes `as_of` |
+| Analytics e reconciliação | endurecimento em curso | valuation falha fechado e atribuição separa principal |
 | Configuração pessoal | aguardando dados | `uv run marko status` lista nove campos |
 | Data Gateway | parcial operacional | BCB/SGS e SIDRA ao vivo; demais aguardam acesso |
-| Baseline Portfolio Lab | concluído | cinco baselines e dois adapters factíveis |
-| Validation Framework | concluído no corte inicial | walk-forward, purge, embargo, custos e stress |
-| Decision Engine | concluído no modo aporte | `NO_ACTION` e `cash_flow_only` |
-| Shadow portfolio | não iniciado | depende de IPS e persistência |
+| Baseline Portfolio Lab | concluído | cinco baselines e adapters opcionais testáveis no CI |
+| Validation Framework | endurecimento em curso | candidato validado, drift, step e PSD explícitos |
+| Decision Engine | endurecimento em curso | caixa explícito e ModelRun validado |
+| Persistência | bloqueada | depende da conclusão da v0.2.1 |
+| Shadow portfolio | não iniciado | depende de IPS e v0.3.0 |
 | Capital real | bloqueado | depende de todos os gates e revisão humana |
 
 ## Agora
 
-1. receber os nove dados do caso pessoal;
-2. persistir ledger, observations, ModelRuns e DecisionPackets;
-3. adicionar regras fiscais brasileiras e casos TWR multimoeda;
+1. concluir os invariantes e golden cases da v0.2.1;
+2. receber os dados ainda ausentes do caso pessoal em configuração privada;
+3. iniciar persistência somente após o gate de integridade;
 4. configurar Tesouro Direto, ANBIMA e B3;
-5. iniciar shadow operation.
+5. preparar shadow operation.
 
 ## Qualidade
 
 ```text
-55 testes
-85% de cobertura
+75 testes do quality gate e 1 integração opcional
+86% de cobertura
 Ruff aprovado
 MyPy strict aprovado
-BCB/SGS e SIDRA validados ao vivo
+skfolio e PyPortfolioOpt em job opcional
 ```
 
 O roadmap completo está em [`docs/roadmap.md`](docs/roadmap.md). O contexto para agentes e revisores está em [`docs/HANDOFF_GPT_PRO.md`](docs/HANDOFF_GPT_PRO.md).

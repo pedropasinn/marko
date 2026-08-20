@@ -1,3 +1,6 @@
+# Plano original do projeto
+
+Documento histórico preservado como registro da concepção inicial. As fontes canônicas atuais são `STATUS.md`, `docs/roadmap.md`, `CHANGELOG.md` e os ADRs.
 
 Sim. Eu mudaria a definição do projeto para algo mais ambicioso:
 

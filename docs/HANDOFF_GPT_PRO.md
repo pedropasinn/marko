@@ -14,23 +14,25 @@ Não existe autorização para investir, recomendar uma carteira real ou enviar 
 
 ## Estado atual
 
-O pacote está na versão `0.2.0`. Foram concluídos:
+O pacote está na versão `0.2.1` em endurecimento. Persistência está bloqueada até este gate fechar. Foram concluídos:
 
 1. arqueologia de onze projetos open source;
 2. kernel contábil e de política;
 3. analytics essenciais;
-4. configuração versionável do caso pessoal;
+4. separação entre configuração pública sintética e caso pessoal privado;
 5. gateway brasileiro ponto-no-tempo;
 6. Portfolio Lab com baselines e adapters;
 7. ModelRun e Solver Registry;
 8. validação temporal e stress;
 9. DecisionPacket com `NO_ACTION`;
-10. cash-flow rebalancing sem vendas.
+10. cash-flow rebalancing sem vendas;
+11. reversões contábeis refletidas nos lotes por `as_of`;
+12. valuation completo/incompleto com proveniência;
+13. candidatos pós-validados obrigatórios na decisão.
 
 Validação atual:
 
-- 55 testes aprovados;
-- 85% de cobertura;
+- 75 testes do quality gate, 1 integração opcional e 86% de cobertura;
 - Ruff aprovado;
 - MyPy estrito aprovado;
 - BCB/SGS e IBGE/SIDRA exercitados ao vivo;
@@ -97,11 +99,7 @@ Dois casos Excel de XIRR do Portfolio Performance foram convertidos em golden te
 
 Representam Liability, fluxos, funding ratio, shortfall, IPS, Universe e Constraint Set. `PersonalCase` converte uma configuração completa em Liability, IPS e Universe.
 
-O arquivo `config/personal-case.toml` contém somente fatos conhecidos:
-
-- principal: R$ 50.000;
-- aporte mensal: R$ 2.000;
-- credora: mãe.
+O arquivo `config/personal-case.example.toml` contém somente valores sintéticos. O caso real deve ser fornecido por `MARKO_CASE_PATH` ou arquivo local ignorado. Os fatos do pedido original não são versionados em configuração pública.
 
 Campos desconhecidos permanecem vazios. O CLI retorna `ready: false` até que sejam preenchidos.
 
@@ -269,13 +267,14 @@ Somente depois disso gerar IPS real. Mesmo com o IPS completo, capital real cont
 
 ## Próxima sequência recomendada
 
-1. obter os nove dados pessoais e versionar IPS/Liability;
-2. adicionar casos dourados de TWR multimoeda e transferências;
-3. implementar regras fiscais brasileiras por instrumento/prazo;
-4. persistir ledger, observations, ModelRuns e DecisionPackets em PostgreSQL/Parquet;
-5. configurar endpoints/credenciais de Tesouro, ANBIMA e B3;
-6. operar shadow portfolio com CDI, 1/N e carteira real como benchmarks;
-7. só então avançar para Black–Litterman, HRP/HERC/NCO, CVaR/CDaR e ensemble dentro do produto.
+1. concluir a v0.2.1 e seus invariantes;
+2. obter os nove dados pessoais em configuração privada e gerar IPS/Liability;
+3. adicionar casos dourados de TWR multimoeda;
+4. implementar regras fiscais brasileiras por instrumento/prazo;
+5. somente então persistir ledger, observations, ModelRuns e DecisionPackets em PostgreSQL/Parquet;
+6. configurar endpoints/credenciais de Tesouro, ANBIMA e B3;
+7. operar shadow portfolio com CDI, 1/N e carteira real como benchmarks;
+8. só então avançar para Black–Litterman, HRP/HERC/NCO, CVaR/CDaR e ensemble dentro do produto.
 
 ## Regras para qualquer continuação
 
@@ -286,4 +285,6 @@ Somente depois disso gerar IPS real. Mesmo com o IPS completo, capital real cont
 - nunca usar dado revisado como se estivesse disponível no passado;
 - nunca transformar saída de LLM diretamente em ordem;
 - nunca preencher informações financeiras pessoais por suposição;
+- nunca persistir valuation parcial como patrimônio total;
+- nunca encaminhar `PortfolioCandidate` bruto à decisão;
 - nunca incorporar código de licença incompatível sem revisão jurídica e ADR.
