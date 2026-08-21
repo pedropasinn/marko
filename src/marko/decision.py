@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+import json
+from dataclasses import dataclass, fields, is_dataclass
 from datetime import datetime
 from decimal import ROUND_DOWN, Decimal
-from enum import StrEnum
+from enum import Enum, StrEnum
+from typing import cast
 
 from marko.money import Money, decimal_value
 from marko.portfolio_lab import ValidatedPortfolioCandidate
+from marko.research_registry import ModelRun
 
 
 class TradeSide(StrEnum):
@@ -63,14 +67,205 @@ class CashTarget:
         object.__setattr__(self, "maximum_weight", maximum)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class ValidatedModelRunRef:
     run_id: str
-    candidate: ValidatedPortfolioCandidate
+    run_payload_hash: str | None
+    dataset_fingerprint: str | None = None
+    candidate_hash: str = ""
+    validation_witness: str = ""
+    dataset_available_at: datetime | None = None
 
-    def __post_init__(self) -> None:
-        if not self.run_id.strip():
+    def __init__(
+        self,
+        run: ModelRun,
+        dataset_available_at: datetime | None = None,
+    ) -> None:
+        if not isinstance(run, ModelRun):
+            raise TypeError("ValidatedModelRunRef exige uma instância de ModelRun")
+        if run.validated_candidate is None or run.violations:
+            raise ValueError("referência exige ModelRun validado")
+        if run.validated_candidate.candidate != run.candidate:
+            raise ValueError("candidato validado diverge do ModelRun")
+        self._set_values(
+            run_id=run.run_id,
+            run_payload_hash=_model_run_payload_hash(run),
+            dataset_fingerprint=run.dataset_fingerprint,
+            candidate_hash=_content_hash("marko.portfolio_candidate@1", run.candidate),
+            validation_witness=_content_hash(
+                "marko.validated_model_run@1",
+                {
+                    "run_id": run.run_id,
+                    "validated_candidate": run.validated_candidate,
+                },
+            ),
+            dataset_available_at=dataset_available_at,
+        )
+
+    @classmethod
+    def from_model_run(
+        cls,
+        run: ModelRun,
+        *,
+        dataset_available_at: datetime | None = None,
+    ) -> ValidatedModelRunRef:
+        return cls(run, dataset_available_at)
+
+    @classmethod
+    def _from_persisted(
+        cls,
+        *,
+        run_id: str,
+        run_payload_hash: str | None,
+        dataset_fingerprint: str | None,
+        candidate_hash: str,
+        validation_witness: str,
+        dataset_available_at: datetime | None,
+    ) -> ValidatedModelRunRef:
+        reference = object.__new__(cls)
+        reference._set_values(
+            run_id=run_id,
+            run_payload_hash=run_payload_hash,
+            dataset_fingerprint=dataset_fingerprint,
+            candidate_hash=candidate_hash,
+            validation_witness=validation_witness,
+            dataset_available_at=dataset_available_at,
+        )
+        return reference
+
+    @classmethod
+    def _from_legacy(
+        cls,
+        *,
+        run_id: str,
+        candidate: ValidatedPortfolioCandidate,
+        dataset_fingerprint: str | None,
+        dataset_available_at: datetime | None,
+    ) -> ValidatedModelRunRef:
+        return cls._from_persisted(
+            run_id=run_id,
+            run_payload_hash=None,
+            dataset_fingerprint=dataset_fingerprint,
+            candidate_hash=_content_hash("marko.portfolio_candidate@1", candidate.candidate),
+            validation_witness=_content_hash(
+                "marko.validated_model_run@1",
+                {"run_id": run_id, "validated_candidate": candidate},
+            ),
+            dataset_available_at=dataset_available_at,
+        )
+
+    def _set_values(
+        self,
+        *,
+        run_id: str,
+        run_payload_hash: str | None,
+        dataset_fingerprint: str | None,
+        candidate_hash: str,
+        validation_witness: str,
+        dataset_available_at: datetime | None,
+    ) -> None:
+        if not run_id.strip():
             raise ValueError("run_id é obrigatório")
+        if dataset_fingerprint is not None and not dataset_fingerprint.strip():
+            raise ValueError("dataset_fingerprint não pode ser vazio")
+        if dataset_available_at is not None and dataset_available_at.tzinfo is None:
+            raise ValueError("dataset_available_at precisa de timezone")
+        for name, value in (
+            ("run_payload_hash", run_payload_hash),
+            ("candidate_hash", candidate_hash),
+            ("validation_witness", validation_witness),
+        ):
+            if value is not None and not _is_sha256(value):
+                raise ValueError(f"{name} precisa ser SHA-256 hexadecimal")
+        object.__setattr__(self, "run_id", run_id)
+        object.__setattr__(self, "run_payload_hash", run_payload_hash)
+        object.__setattr__(self, "dataset_fingerprint", dataset_fingerprint)
+        object.__setattr__(self, "candidate_hash", candidate_hash)
+        object.__setattr__(self, "validation_witness", validation_witness)
+        object.__setattr__(self, "dataset_available_at", dataset_available_at)
+
+    def reconciles_with(self, run: ModelRun) -> bool:
+        try:
+            expected = type(self).from_model_run(
+                run,
+                dataset_available_at=self.dataset_available_at,
+            )
+        except ValueError:
+            return False
+        return (
+            self.run_id == expected.run_id
+            and self.candidate_hash == expected.candidate_hash
+            and self.validation_witness == expected.validation_witness
+            and (
+                self.run_payload_hash is None or self.run_payload_hash == expected.run_payload_hash
+            )
+            and (
+                self.dataset_fingerprint is None
+                or self.dataset_fingerprint == expected.dataset_fingerprint
+            )
+        )
+
+    def with_dataset_available_at(self, value: datetime) -> ValidatedModelRunRef:
+        return type(self)._from_persisted(
+            run_id=self.run_id,
+            run_payload_hash=self.run_payload_hash,
+            dataset_fingerprint=self.dataset_fingerprint,
+            candidate_hash=self.candidate_hash,
+            validation_witness=self.validation_witness,
+            dataset_available_at=value,
+        )
+
+
+def _content_hash(domain: str, value: object) -> str:
+    document = {"domain": domain, "value": _canonical_value(value)}
+    canonical = json.dumps(
+        document,
+        allow_nan=False,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _model_run_payload_hash(run: ModelRun) -> str:
+    canonical = json.dumps(
+        {
+            "schema": "marko.model_run",
+            "version": 1,
+            "payload": _canonical_value(run),
+        },
+        allow_nan=False,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _canonical_value(value: object) -> object:
+    if is_dataclass(value) and not isinstance(value, type):
+        return {field.name: _canonical_value(getattr(value, field.name)) for field in fields(value)}
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, Enum):
+        return _canonical_value(value.value)
+    if isinstance(value, dict):
+        return {
+            str(key): _canonical_value(item)
+            for key, item in cast(dict[object, object], value).items()
+        }
+    if isinstance(value, (tuple, list)):
+        return [_canonical_value(item) for item in value]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    raise TypeError(f"valor não serializável para hash: {type(value).__name__}")
+
+
+def _is_sha256(value: str) -> bool:
+    return len(value) == 64 and all(character in "0123456789abcdef" for character in value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +317,8 @@ class DecisionPacket:
     model_runs: tuple[ValidatedModelRunRef, ...]
     evidence_ids: tuple[str, ...]
     alternatives: tuple[DecisionAlternative, ...]
+    shadow_request_id: str | None = None
+    knowledge_cutoff: datetime | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -136,6 +333,15 @@ class DecisionPacket:
             raise ValueError("model_run_ids duplicados")
         if len(self.evidence_ids) != len(set(self.evidence_ids)):
             raise ValueError("evidence_ids duplicados")
+        if (self.shadow_request_id is None) != (self.knowledge_cutoff is None):
+            raise ValueError("shadow_request_id e knowledge_cutoff precisam ser informados juntos")
+        if self.shadow_request_id is not None and not self.shadow_request_id.strip():
+            raise ValueError("shadow_request_id não pode ser vazio")
+        if self.knowledge_cutoff is not None:
+            if self.knowledge_cutoff.tzinfo is None:
+                raise ValueError("knowledge_cutoff precisa de timezone")
+            if self.knowledge_cutoff > self.created_at:
+                raise ValueError("knowledge_cutoff não pode suceder created_at")
         identifiers = {alternative.alternative_id for alternative in self.alternatives}
         if "no_action" not in identifiers:
             raise ValueError("DecisionPacket exige a alternativa NO_ACTION")
@@ -169,6 +375,8 @@ class CashFlowRebalancer:
         evidence_ids: tuple[str, ...] = (),
         minimum_cash: Money | None = None,
         maximum_turnover: Decimal | None = None,
+        shadow_request_id: str | None = None,
+        knowledge_cutoff: datetime | None = None,
     ) -> DecisionPacket:
         if contribution.amount < 0:
             raise ValueError("contribution não pode ser negativa")
@@ -223,6 +431,8 @@ class CashFlowRebalancer:
             model_runs,
             evidence_ids,
             (no_action, rebalance),
+            shadow_request_id,
+            knowledge_cutoff,
         )
 
     def _no_action(

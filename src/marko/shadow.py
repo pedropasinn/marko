@@ -76,10 +76,24 @@ class ShadowRunRequest:
             raise ValueError("knowledge_cutoff não pode suceder scheduled_for")
 
     @classmethod
-    def create(cls, schedule_id: str, scheduled_for: datetime) -> ShadowRunRequest:
-        canonical = f"{schedule_id}|{scheduled_for.astimezone(UTC).isoformat()}"
+    def create(
+        cls,
+        schedule_id: str,
+        scheduled_for: datetime,
+        knowledge_cutoff: datetime | None = None,
+    ) -> ShadowRunRequest:
+        cutoff = scheduled_for if knowledge_cutoff is None else knowledge_cutoff
+        if scheduled_for.tzinfo is None or cutoff.tzinfo is None:
+            raise ValueError("timestamps precisam de timezone")
+        canonical = "|".join(
+            (
+                schedule_id,
+                scheduled_for.astimezone(UTC).isoformat(),
+                cutoff.astimezone(UTC).isoformat(),
+            )
+        )
         request_id = hashlib.sha256(canonical.encode()).hexdigest()
-        return cls(request_id, schedule_id, scheduled_for, scheduled_for)
+        return cls(request_id, schedule_id, scheduled_for, cutoff)
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,16 +105,38 @@ class ShadowReconciliation:
     future_model_run_ids: tuple[str, ...]
     missing_evidence_ids: tuple[str, ...]
     future_evidence_ids: tuple[str, ...]
+    request_id: str | None = None
+    knowledge_cutoff: datetime | None = None
+    missing_dataset_run_ids: tuple[str, ...] = ()
+    mismatched_dataset_run_ids: tuple[str, ...] = ()
+    future_dataset_run_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.packet_id.strip() or self.checked_at.tzinfo is None:
+            raise ValueError("packet_id e checked_at com timezone são obrigatórios")
+        if (self.request_id is None) != (self.knowledge_cutoff is None):
+            raise ValueError("request_id e knowledge_cutoff precisam ser informados juntos")
+        if self.request_id is not None and not self.request_id.strip():
+            raise ValueError("request_id não pode ser vazio")
+        if self.knowledge_cutoff is not None and self.knowledge_cutoff.tzinfo is None:
+            raise ValueError("knowledge_cutoff precisa de timezone")
 
     @property
     def ready(self) -> bool:
-        return not any(
-            (
-                self.missing_model_run_ids,
-                self.mismatched_model_run_ids,
-                self.future_model_run_ids,
-                self.missing_evidence_ids,
-                self.future_evidence_ids,
+        return (
+            self.request_id is not None
+            and self.knowledge_cutoff is not None
+            and not any(
+                (
+                    self.missing_model_run_ids,
+                    self.mismatched_model_run_ids,
+                    self.future_model_run_ids,
+                    self.missing_evidence_ids,
+                    self.future_evidence_ids,
+                    self.missing_dataset_run_ids,
+                    self.mismatched_dataset_run_ids,
+                    self.future_dataset_run_ids,
+                )
             )
         )
 
@@ -108,6 +144,7 @@ class ShadowReconciliation:
 def reconcile_shadow_packet(
     packet: DecisionPacket,
     *,
+    request: ShadowRunRequest,
     model_runs: tuple[ModelRun, ...],
     observations: tuple[Observation, ...],
     checked_at: datetime,
@@ -116,27 +153,38 @@ def reconcile_shadow_packet(
         raise ValueError("checked_at precisa de timezone")
     if checked_at < packet.created_at:
         raise ValueError("checked_at não pode preceder o DecisionPacket")
+    request_id, knowledge_cutoff = _shadow_context(packet, request)
     runs = _unique_by_id(model_runs, "run_id")
     evidence = _unique_by_id(observations, "observation_id")
     missing_runs = []
     mismatched_runs = []
     future_runs = []
+    missing_datasets = []
+    mismatched_datasets = []
+    future_datasets = []
     for reference in packet.model_runs:
         run = runs.get(reference.run_id)
         if run is None:
             missing_runs.append(reference.run_id)
             continue
-        if run.validated_candidate != reference.candidate:
+        if not reference.reconciles_with(run):
             mismatched_runs.append(reference.run_id)
-        if run.created_at > packet.created_at:
+        if run.created_at > knowledge_cutoff:
             future_runs.append(reference.run_id)
+        if reference.dataset_available_at is None or reference.dataset_fingerprint is None:
+            missing_datasets.append(reference.run_id)
+        else:
+            if reference.dataset_fingerprint != run.dataset_fingerprint:
+                mismatched_datasets.append(reference.run_id)
+            if reference.dataset_available_at > knowledge_cutoff:
+                future_datasets.append(reference.run_id)
     missing_evidence = []
     future_evidence = []
     for identifier in packet.evidence_ids:
         observation = evidence.get(identifier)
         if observation is None:
             missing_evidence.append(identifier)
-        elif observation.times.available_at > packet.created_at:
+        elif observation.times.available_at > knowledge_cutoff:
             future_evidence.append(identifier)
     return ShadowReconciliation(
         packet.packet_id,
@@ -146,7 +194,23 @@ def reconcile_shadow_packet(
         tuple(future_runs),
         tuple(missing_evidence),
         tuple(future_evidence),
+        request_id,
+        knowledge_cutoff,
+        tuple(missing_datasets),
+        tuple(mismatched_datasets),
+        tuple(future_datasets),
     )
+
+
+def _shadow_context(packet: DecisionPacket, request: ShadowRunRequest) -> tuple[str, datetime]:
+    if packet.shadow_request_id is None or packet.knowledge_cutoff is None:
+        raise ValueError("DecisionPacket não está ligado a um ShadowRunRequest")
+    if (
+        request.request_id != packet.shadow_request_id
+        or request.knowledge_cutoff != packet.knowledge_cutoff
+    ):
+        raise ValueError("DecisionPacket não corresponde ao ShadowRunRequest")
+    return packet.shadow_request_id, packet.knowledge_cutoff
 
 
 def _unique_by_id[T](values: tuple[T, ...], attribute: str) -> dict[str, T]:

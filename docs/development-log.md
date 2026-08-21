@@ -58,6 +58,23 @@
 - CLI operacional e job de integração PostgreSQL 16/Parquet.
 - 92 testes locais aprovados, 2 integrações condicionais e 84% de cobertura.
 
+## 20/08/2026 — Marko 0.3.1 Operational Integrity
+
+- `ShadowRunRequest` virou verdade persistida e o `knowledge_cutoff` passou a acompanhar todo o ciclo;
+- DecisionPacket, ModelRun, fingerprint de dataset, snapshot, vintages e observações passaram a ser reconciliados no mesmo corte PIT;
+- diário shadow append-only com transições e cadeia de hashes;
+- relatório sintético de TWR, drawdown e drift contra CDI e 1/N, sem inventar séries ausentes;
+- backup privado v4 AES-256-GCM, restore com pré-validação semântica e aplicação atômica no PostgreSQL;
+- endurecimento de codecs e validação integral de artefatos Parquet;
+- provider do Tesouro Direto migrado para descoberta pelo CKAN oficial do Tesouro Transparente;
+- Read API FastAPI e Marko Console React/TypeScript/PWA somente leitura;
+- Console e API publicados como demonstração sintética, com Neon exclusivamente sintético em `gru1` e Neon Auth habilitada;
+- `DecisionPacket@3` compacto e ciclos shadow completos persistidos de forma append-only;
+- CI ampliado com frontend e smoke do wheel, preservando os gates anteriores.
+- validação local: 156 testes aprovados, 3 integrações condicionais ignoradas e 82,77% de cobertura; frontend com 8 testes, typecheck, build PWA e auditoria sem vulnerabilidades.
+
+A publicação tornou a fronteira de segurança mais explícita: Neon Auth habilitada não basta. Dados reais permanecem proibidos até autenticação efetiva e IPS privado.
+
 ## Como este diário evolui
 
 Cada versão deve registrar decisões, resultados negativos, incompatibilidades e dívidas técnicas. O changelog descreve o que mudou; este diário explica por que a direção mudou.

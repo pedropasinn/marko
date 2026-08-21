@@ -19,3 +19,5 @@ Tokens, chaves, cookies, credenciais de providers, brokers e bancos. Devem usar 
 ## Publicação
 
 Antes de qualquer commit, revisar nomes de arquivos, diff staged e padrões de segredo. Dados privados não podem ser anonimizados apenas removendo o nome: valores, datas e relações também podem identificar o proprietário.
+
+O Console e a Read API públicos operam somente com fixtures sintéticas; o Neon em `gru1` deve permanecer vazio ou conter apenas dados sintéticos. Neon Auth habilitada na infraestrutura não satisfaz sozinha o gate de acesso. Nenhum dado privado financeiro pode ser enviado ao ambiente público antes de autenticação efetiva ponta a ponta, autorização por identidade e IPS armazenado fora do repositório.

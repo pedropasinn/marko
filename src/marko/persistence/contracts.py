@@ -6,6 +6,8 @@ from typing import Protocol
 from marko.activities import Activity
 from marko.decision import DecisionPacket
 from marko.research_registry import ModelRun
+from marko.shadow import ShadowRunRequest
+from marko.shadow_operation import ShadowCycleRecord
 from marko.temporal import Observation
 
 
@@ -43,11 +45,29 @@ class DecisionPacketRepository(Protocol):
     def decision_packets(self) -> tuple[DecisionPacket, ...]: ...
 
 
+class ShadowRunRequestRepository(Protocol):
+    def append_shadow_run_request(self, request: ShadowRunRequest) -> None: ...
+
+    def get_shadow_run_request(self, request_id: str) -> ShadowRunRequest: ...
+
+    def shadow_run_requests(self) -> tuple[ShadowRunRequest, ...]: ...
+
+
+class ShadowCycleRepository(Protocol):
+    def append_shadow_cycle_record(self, record: ShadowCycleRecord) -> None: ...
+
+    def get_shadow_cycle_record(self, record_id: str) -> ShadowCycleRecord: ...
+
+    def shadow_cycle_records(self) -> tuple[ShadowCycleRecord, ...]: ...
+
+
 class PersistenceStore(
     ActivityRepository,
     ObservationRepository,
     ModelRunRepository,
     DecisionPacketRepository,
+    ShadowRunRequestRepository,
+    ShadowCycleRepository,
     Protocol,
 ):
     pass

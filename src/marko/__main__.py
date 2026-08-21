@@ -9,13 +9,19 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from marko.case_config import load_case
-from marko.data_gateway import BcbSgsProvider, SeriesQuery, SidraProvider
+from marko.data_gateway import (
+    BcbSgsProvider,
+    SeriesQuery,
+    SidraProvider,
+    TreasuryDirectProvider,
+)
 from marko.persistence import (
     PostgresStore,
     create_backup,
     restore_backup,
     verify_backup,
 )
+from marko.read_api.demo import DemoReadStore
 from marko.shadow import MonthlyShadowSchedule, reconcile_shadow_packet
 from marko.temporal import Observation
 
@@ -39,17 +45,60 @@ def main(argv: list[str] | None = None) -> int:
     sidra.add_argument("--variable", required=True)
     sidra.add_argument("--period", default="last 1")
 
+    treasury = commands.add_parser(
+        "fetch-tesouro", help="consulta o CSV oficial do Tesouro Direto"
+    )
+    treasury.add_argument(
+        "series",
+        choices=("buy_rate", "sell_rate", "buy_price", "sell_price", "base_price"),
+    )
+    treasury.add_argument("--start", type=date.fromisoformat)
+    treasury.add_argument("--end", type=date.fromisoformat)
+
     migrate = commands.add_parser("db-migrate", help="aplica migrações PostgreSQL")
     migrate.add_argument("--dsn")
 
-    backup = commands.add_parser("backup", help="cria backup canônico do PostgreSQL")
+    seed_demo = commands.add_parser(
+        "db-seed-demo", help="grava o dataset demonstrativo explicitamente sintético"
+    )
+    seed_demo.add_argument("--dsn")
+    seed_demo.add_argument("--confirm-synthetic", action="store_true")
+
+    backup = commands.add_parser(
+        "backup",
+        help="cria backup canônico; backup privado exige MARKO_BACKUP_ENCRYPTION_KEY",
+        description=(
+            "Cria backup canônico. Use --private com "
+            "MARKO_BACKUP_ENCRYPTION_KEY em base64 para dados privados."
+        ),
+    )
     backup.add_argument("output", type=Path)
     backup.add_argument("--dsn")
+    backup.add_argument(
+        "--private",
+        action="store_true",
+        help="criptografa com AES-256-GCM usando MARKO_BACKUP_ENCRYPTION_KEY",
+    )
+    backup.add_argument("--key-id", help="identificador público da chave de criptografia")
 
-    backup_verify = commands.add_parser("backup-verify", help="verifica backup canônico")
+    backup_verify = commands.add_parser(
+        "backup-verify",
+        help="verifica backup; backup privado exige MARKO_BACKUP_ENCRYPTION_KEY",
+        description=(
+            "Verifica backup canônico. Backup privado exige "
+            "MARKO_BACKUP_ENCRYPTION_KEY em base64."
+        ),
+    )
     backup_verify.add_argument("input", type=Path)
 
-    backup_restore = commands.add_parser("backup-restore", help="restaura backup idempotente")
+    backup_restore = commands.add_parser(
+        "backup-restore",
+        help="restaura backup; backup privado exige MARKO_BACKUP_ENCRYPTION_KEY",
+        description=(
+            "Restaura backup idempotente. Backup privado exige "
+            "MARKO_BACKUP_ENCRYPTION_KEY em base64."
+        ),
+    )
     backup_restore.add_argument("input", type=Path)
     backup_restore.add_argument("--dsn")
 
@@ -94,19 +143,80 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             )
             _print_observations(SidraProvider().fetch(query, datetime.now(UTC)))
+        elif arguments.command == "fetch-tesouro":
+            query = SeriesQuery(arguments.series, arguments.start, arguments.end)
+            _print_observations(TreasuryDirectProvider().fetch(query, datetime.now(UTC)))
         elif arguments.command == "db-migrate":
             store = _postgres_store(arguments.dsn)
             store.migrate()
             _print({"migrated": True})
+        elif arguments.command == "db-seed-demo":
+            if not arguments.confirm_synthetic:
+                raise ValueError("db-seed-demo exige --confirm-synthetic")
+            store = _postgres_store(arguments.dsn)
+            demo = DemoReadStore()
+            store.append_activities(demo.activities())
+            demo_observations = demo.observations_as_known_at(
+                None, datetime.max.replace(tzinfo=UTC)
+            )
+            for observation in demo_observations:
+                store.append_observation(observation)
+            for run in demo.model_runs():
+                store.append_model_run(run)
+            for request in demo.shadow_run_requests():
+                store.append_shadow_run_request(request)
+            for packet in demo.decision_packets():
+                store.append_decision_packet(packet)
+            _print(
+                {
+                    "synthetic": True,
+                    "activities": len(demo.activities()),
+                    "observations": len(demo_observations),
+                    "model_runs": len(demo.model_runs()),
+                    "shadow_run_requests": len(demo.shadow_run_requests()),
+                    "decision_packets": len(demo.decision_packets()),
+                }
+            )
         elif arguments.command == "backup":
             store = _postgres_store(arguments.dsn)
-            _print(asdict(create_backup(arguments.output, store)))
+            encryption_key = _backup_encryption_key() if arguments.private else None
+            if arguments.private and encryption_key is None:
+                raise ValueError(
+                    "backup privado exige MARKO_BACKUP_ENCRYPTION_KEY em base64"
+                )
+            _print(
+                asdict(
+                    create_backup(
+                        arguments.output,
+                        store,
+                        encryption_key=encryption_key,
+                        key_id=arguments.key_id,
+                    )
+                )
+            )
         elif arguments.command == "backup-verify":
-            _print(asdict(verify_backup(arguments.input)))
+            _print(
+                asdict(
+                    verify_backup(
+                        arguments.input,
+                        encryption_key=_backup_encryption_key(),
+                    )
+                )
+            )
         elif arguments.command == "backup-restore":
+            encryption_key = _backup_encryption_key()
+            verify_backup(arguments.input, encryption_key=encryption_key)
             store = _postgres_store(arguments.dsn)
             store.migrate()
-            _print(asdict(restore_backup(arguments.input, store)))
+            _print(
+                asdict(
+                    restore_backup(
+                        arguments.input,
+                        store,
+                        encryption_key=encryption_key,
+                    )
+                )
+            )
         elif arguments.command == "shadow-due":
             schedule = MonthlyShadowSchedule(
                 arguments.schedule_id,
@@ -130,14 +240,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             store = _postgres_store(arguments.dsn)
             packet = store.get_decision_packet(arguments.packet_id)
+            if packet.shadow_request_id is None:
+                raise ValueError("DecisionPacket não está ligado a um ShadowRunRequest")
+            request = store.get_shadow_run_request(packet.shadow_request_id)
             report = reconcile_shadow_packet(
                 packet,
+                request=request,
                 model_runs=store.model_runs(),
                 observations=store.observations(),
                 checked_at=arguments.checked_at,
             )
             report_payload = asdict(report)
             report_payload["checked_at"] = report.checked_at.isoformat()
+            if report.knowledge_cutoff is not None:
+                report_payload["knowledge_cutoff"] = report.knowledge_cutoff.isoformat()
             report_payload["ready"] = report.ready
             _print(report_payload)
     except (KeyError, OSError, ValueError, RuntimeError) as error:
@@ -163,6 +279,11 @@ def _postgres_store(explicit_dsn: str | None) -> PostgresStore:
     if not dsn:
         raise ValueError("informe --dsn ou MARKO_DATABASE_URL")
     return PostgresStore(dsn)
+
+
+def _backup_encryption_key() -> str | None:
+    value = os.environ.get("MARKO_BACKUP_ENCRYPTION_KEY")
+    return value if value and value.strip() else None
 
 
 def _print_observations(observations: tuple[Observation, ...]) -> None:

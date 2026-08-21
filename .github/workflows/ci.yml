@@ -35,6 +35,37 @@ jobs:
         run: uv run mypy
       - name: Tests
         run: uv run pytest --cov=marko --cov-report=term-missing --cov-fail-under=80
+      - name: Build package
+        run: uv build
+      - name: Install and test wheel
+        run: |
+          uv venv /tmp/marko-wheel-test
+          uv pip install --python /tmp/marko-wheel-test/bin/python dist/*.whl
+          cd /tmp
+          /tmp/marko-wheel-test/bin/python -c "from marko.read_api import create_app; assert create_app(mode='demo').title == 'Marko Read API'"
+
+  frontend:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/console
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/console/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
 
   persistence-integration:
     if: github.event_name != 'schedule'
@@ -102,3 +133,5 @@ jobs:
         run: uv run marko fetch-bcb 1178 --start 2026-08-19 --end 2026-08-19
       - name: SIDRA smoke
         run: uv run marko fetch-sidra IPCA --table 1737 --variable 2266 --period "last 1"
+      - name: Tesouro Direto CKAN smoke
+        run: uv run marko fetch-tesouro buy_rate --start 2026-08-19 --end 2026-08-19
