@@ -16,11 +16,17 @@ Estado: concluída em 20/08/2026.
 
 Portas de repositório, contratos de serialização versionados, PostgreSQL operacional, Parquet de pesquisa, migrações, round trips, idempotência, backup/restore, scheduler shadow e reconciliação.
 
+### v0.3.1 — Operational Integrity
+
+Estado: concluída em 20/08/2026.
+
+Persistência de `ShadowRunRequest`, ciclos completos e `knowledge_cutoff`, diário operacional shadow append-only, benchmarks e falhas explícitas, referências compactas de `ModelRun`, backup privado AES-256-GCM, hardening de restore/codecs/Parquet, Read API somente leitura, Marko Console React/TypeScript/PWA e deploy público exclusivamente sintético.
+
 ### v0.4.0 — Personal IPS and Shadow Operation
 
 Estado: aguardando informações e acessos do proprietário.
 
-Liability/IPS/Universe reais em configuração privada, conectores atuais de Tesouro Direto/ANBIMA/B3, benchmarks CDI e 1/N, diário de decisões, relatórios de drift/risco e operação shadow sem capital real.
+Autenticação efetiva, Liability/IPS/Universe reais em configuração privada, credenciais atuais de ANBIMA/B3 e operação shadow prolongada sem capital real. O provider do Tesouro Direto já usa o CKAN oficial; os benchmarks CDI/1/N e o diário existem no núcleo, mas ainda precisam de operação com o caso privado.
 
 ## Gates de capacidade
 
@@ -28,13 +34,13 @@ Liability/IPS/Universe reais em configuração privada, conectores atuais de Tes
 |---|---|---|
 | G1 | Accounting | endurecimento v0.2.1 concluído |
 | G2 | Analytics | corte inicial implementado |
-| G3 | Data | BCB/SGS e SIDRA operacionais; demais pendentes |
+| G3 | Data | BCB/SGS, SIDRA e contrato CKAN do Tesouro; ANBIMA/B3 bloqueados por credenciais |
 | G4 | Baselines | implementado |
 | G5 | Validation | endurecimento v0.2.1 concluído |
 | G6 | Advanced Models | não iniciado |
 | G7 | Decision | draft por aporte e candidato validado |
 | G8 | Research Agents | não iniciado |
-| G9 | Shadow | readiness concluída; operação aguarda IPS e providers |
+| G9 | Shadow | integridade operacional concluída; histórico real aguarda autenticação e IPS privado |
 
 ## Gate para capital real
 

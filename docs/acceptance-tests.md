@@ -35,6 +35,6 @@
 - [x] Parquet preserva observações e hash do conteúdo;
 - [x] PostgreSQL detecta conflito e bloqueia UPDATE/DELETE;
 - [x] scheduler shadow é determinístico e reconciliação rejeita evidência futura;
-- [ ] casos dourados de TWR com transferências e múltiplas moedas;
+- [x] casos dourados de TWR com transferências e múltiplas moedas;
 - [ ] confirmação de broker duplicada é idempotente;
 - [ ] impostos brasileiros por instrumento e prazo.

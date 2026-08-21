@@ -4,6 +4,35 @@ As mudanças relevantes do Marko serão registradas aqui por versão.
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-08-20
+
+### Adicionado
+
+- `ShadowRunRequest` persistido, com identidade canônica e `knowledge_cutoff` propagado ao `DecisionPacket`;
+- registro operacional shadow append-only, estados explícitos, reconciliação PIT e relatórios de TWR, drawdown e drift contra CDI e 1/N;
+- Read API FastAPI sob `/api/v1`, apenas para leitura, com adapter PostgreSQL e dataset demonstrativo determinístico;
+- Marko Console React/TypeScript/PWA, inspirado em padrões de hierarquia, disclosure e auditoria estudados no Ghostfolio e no Untitled UI, sem incorporação de código desses projetos;
+- deploy público sintético do Console e da API na Vercel, apoiado por Neon exclusivamente sintético em `gru1` com Neon Auth habilitada;
+- job de frontend no CI e build, instalação e smoke do wheel Python.
+
+### Alterado
+
+- Tesouro Direto passa a descobrir o CSV pelo catálogo CKAN oficial do Tesouro Transparente;
+- backup v4 privado usa AES-256-GCM com chave externa; backups v1–v3 e autenticação HMAC-SHA256 permanecem legíveis;
+- `DecisionPacket@3` persiste referências compactas e verificáveis aos `ModelRun`, sem duplicar a matriz de retornos;
+- ciclos shadow completos passam a ter envelope canônico e persistência PostgreSQL append-only;
+- restore valida o lote completo antes da escrita e usa aplicação atômica no PostgreSQL;
+- codecs rejeitam campos, constantes e identidades semânticas inválidas;
+- Parquet valida schema, metadados, forma canônica, ordem, unicidade, colunas derivadas e hashes antes da publicação atômica.
+
+### Segurança
+
+- a API não expõe rotas de escrita, limita coleções, exige corte temporal onde aplicável, restringe CORS e sanitiza erros internos;
+- o Console não substitui falha HTTP por fixture sintética silenciosamente;
+- o modo privado do Console obtém JWT pelo Neon Auth; a API valida EdDSA via JWKS, expiração, `sub`, allowlist e falha fechada;
+- o runtime público da API usa credencial PostgreSQL dedicada, somente `SELECT`, com transações read-only;
+- dados reais continuam proibidos nos deploys até autenticação efetiva e IPS privado.
+
 ## [0.3.0] — 2026-08-20
 
 ### Adicionado

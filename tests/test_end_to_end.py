@@ -65,7 +65,7 @@ def test_research_result_becomes_auditable_cash_flow_draft() -> None:
         cash=Money.zero("BRL"),
         cash_target=CashTarget(Decimal(0), Decimal(1)),
         contribution=Money.of("2000", "BRL"),
-        model_runs=(ValidatedModelRunRef(run.run_id, run.validated_candidate),),
+        model_runs=(ValidatedModelRunRef.from_model_run(run),),
     )
     assert packet.model_run_ids == (run.run_id,)
     assert {alternative.alternative_id for alternative in packet.alternatives} == {

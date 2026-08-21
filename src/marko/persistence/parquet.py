@@ -50,7 +50,11 @@ class ParquetObservationStore:
         target = self._root / f"{dataset_id}-{content_hash[:16]}.parquet"
         if target.exists():
             artifact, existing = self.read(target)
-            if existing != ordered or artifact.content_hash != content_hash:
+            if (
+                existing != ordered
+                or artifact.content_hash != content_hash
+                or artifact.dataset_id != dataset_id
+            ):
                 raise PersistenceConflictError(f"artefato conflitante: {target.name}")
             return artifact
         pa, parquet = _pyarrow()
@@ -82,14 +86,20 @@ class ParquetObservationStore:
             temporary_path = Path(temporary.name)
         try:
             parquet.write_table(table, temporary_path, compression="zstd")
+            temporary_artifact, restored = self.read(temporary_path)
+            if restored != ordered:
+                raise PersistenceIntegrityError("round-trip Parquet divergiu")
             os.replace(temporary_path, target)
         finally:
             if temporary_path.exists():
                 temporary_path.unlink()
-        artifact, restored = self.read(target)
-        if restored != ordered:
-            raise PersistenceIntegrityError("round-trip Parquet divergiu")
-        return artifact
+        return DatasetArtifact(
+            temporary_artifact.dataset_id,
+            target,
+            temporary_artifact.content_hash,
+            temporary_artifact.file_hash,
+            temporary_artifact.rows,
+        )
 
     def read(self, path: str | Path) -> tuple[DatasetArtifact, tuple[Observation, ...]]:
         source = Path(path)
@@ -105,16 +115,75 @@ class ParquetObservationStore:
         content_raw = metadata.get(b"marko.content_hash")
         if dataset_raw is None or content_raw is None:
             raise PersistenceIntegrityError("metadados Parquet incompletos")
-        dataset_id = dataset_raw.decode()
-        expected_hash = content_raw.decode()
-        payloads = tuple(str(value) for value in table.column("payload").to_pylist())
+        try:
+            dataset_id = dataset_raw.decode("utf-8")
+            expected_hash = content_raw.decode("ascii")
+        except UnicodeError as error:
+            raise PersistenceIntegrityError("metadados Parquet inválidos") from error
+        if not _DATASET_ID.fullmatch(dataset_id):
+            raise PersistenceIntegrityError("dataset_id Parquet inválido")
+        if re.fullmatch(r"[0-9a-f]{64}", expected_hash) is None:
+            raise PersistenceIntegrityError("content_hash Parquet inválido")
+        expected_columns = {
+            "observation_id",
+            "series_id",
+            "effective_at",
+            "available_at",
+            "vintage_id",
+            "payload",
+        }
+        if set(table.column_names) != expected_columns:
+            raise PersistenceIntegrityError("colunas Parquet incompatíveis")
+        raw_payloads = table.column("payload").to_pylist()
+        if not all(isinstance(value, str) for value in raw_payloads):
+            raise PersistenceIntegrityError("payload Parquet precisa ser texto não nulo")
+        payloads = cast(tuple[str, ...], tuple(raw_payloads))
         actual_hash = hashlib.sha256("\n".join(payloads).encode()).hexdigest()
         if actual_hash != expected_hash:
             raise PersistenceIntegrityError("hash do conteúdo Parquet diverge")
-        observations = tuple(
-            decode_observation(SerializationEnvelope.from_json(value)) for value in payloads
-        )
-        file_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        try:
+            envelopes = tuple(SerializationEnvelope.from_json(value) for value in payloads)
+            if any(
+                raw != envelope.canonical_json()
+                for raw, envelope in zip(payloads, envelopes, strict=True)
+            ):
+                raise PersistenceIntegrityError("payload Parquet não está em forma canônica")
+            observations = tuple(decode_observation(envelope) for envelope in envelopes)
+            identifiers = tuple(item.observation_id for item in observations)
+            if identifiers != tuple(sorted(identifiers)) or len(identifiers) != len(
+                set(identifiers)
+            ):
+                raise PersistenceIntegrityError(
+                    "observações Parquet precisam de IDs únicos em ordem canônica"
+                )
+            derived_rows = zip(
+                table.column("observation_id").to_pylist(),
+                table.column("series_id").to_pylist(),
+                table.column("effective_at").to_pylist(),
+                table.column("available_at").to_pylist(),
+                table.column("vintage_id").to_pylist(),
+                observations,
+                strict=True,
+            )
+            for observation_id, series_id, effective_at, available_at, vintage_id, item in (
+                derived_rows
+            ):
+                if (
+                    observation_id != item.observation_id
+                    or series_id != item.series_id
+                    or effective_at != item.times.effective_at
+                    or available_at != item.times.available_at
+                    or vintage_id != item.vintage_id
+                ):
+                    raise PersistenceIntegrityError("coluna derivada diverge do payload Parquet")
+        except (KeyError, TypeError, ValueError) as error:
+            if isinstance(error, PersistenceIntegrityError):
+                raise
+            raise PersistenceIntegrityError("conteúdo Parquet inválido") from error
+        try:
+            file_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        except OSError as error:
+            raise PersistenceIntegrityError("artefato Parquet ilegível") from error
         return (
             DatasetArtifact(
                 dataset_id,

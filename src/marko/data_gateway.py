@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 from calendar import monthrange
@@ -7,7 +8,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Any, Protocol
+from io import StringIO
+from typing import Any, ClassVar, Protocol
 from urllib.error import URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -42,6 +44,10 @@ class JsonTransport(Protocol):
     ) -> list[dict[str, Any]] | dict[str, Any]: ...
 
 
+class TextTransport(Protocol):
+    def get_text(self, url: str, headers: Mapping[str, str] | None = None) -> str: ...
+
+
 class UrlLibJsonTransport:
     def __init__(self, timeout: int = 15, attempts: int = 3) -> None:
         if timeout <= 0 or attempts <= 0:
@@ -63,6 +69,31 @@ class UrlLibJsonTransport:
                 if not isinstance(payload, (list, dict)):
                     raise ValueError("o provider não retornou um documento JSON")
                 return payload
+            except (TimeoutError, URLError) as error:
+                last_error = error
+        raise RuntimeError(
+            f"provider indisponível após {self._attempts} tentativas"
+        ) from last_error
+
+
+class UrlLibTextTransport:
+    def __init__(self, timeout: int = 30, attempts: int = 3) -> None:
+        if timeout <= 0 or attempts <= 0:
+            raise ValueError("timeout e attempts precisam ser positivos")
+        self._timeout = timeout
+        self._attempts = attempts
+
+    def get_text(
+        self, url: str, headers: Mapping[str, str] | None = None
+    ) -> str:
+        request_headers = {"User-Agent": "Marko/0.4.0"}
+        request_headers.update(headers or {})
+        request = Request(url, headers=request_headers)
+        last_error: TimeoutError | URLError | None = None
+        for _ in range(self._attempts):
+            try:
+                with urlopen(request, timeout=self._timeout) as response:
+                    return str(response.read().decode("utf-8-sig"))
             except (TimeoutError, URLError) as error:
                 last_error = error
         raise RuntimeError(
@@ -167,15 +198,87 @@ class SidraProvider:
 
 
 class TreasuryDirectProvider:
-    provider_id = "TESOURO_DIRETO"
+    provider_id = "TESOURO_TRANSPARENTE/TESOURO_DIRETO"
+    package_url = (
+        "https://www.tesourotransparente.gov.br/ckan/api/3/action/package_show"
+        "?id=taxas-dos-titulos-ofertados-pelo-tesouro-direto"
+    )
+    _fields: ClassVar[dict[str, tuple[str, str]]] = {
+        "buy_rate": ("Taxa Compra Manha", "% a.a."),
+        "sell_rate": ("Taxa Venda Manha", "% a.a."),
+        "buy_price": ("PU Compra Manha", "BRL"),
+        "sell_price": ("PU Venda Manha", "BRL"),
+        "base_price": ("PU Base Manha", "BRL"),
+    }
 
-    def __init__(self, endpoint: str, transport: JsonTransport | None = None) -> None:
-        if not endpoint.startswith("https://"):
+    def __init__(
+        self,
+        endpoint: str | None = None,
+        transport: JsonTransport | None = None,
+        text_transport: TextTransport | None = None,
+    ) -> None:
+        if endpoint is not None and not endpoint.startswith("https://"):
             raise ValueError("endpoint do Tesouro precisa usar HTTPS")
         self._endpoint = endpoint
         self._transport = transport or UrlLibJsonTransport()
+        self._text_transport = text_transport or UrlLibTextTransport()
 
     def fetch(self, query: SeriesQuery, retrieved_at: datetime) -> tuple[Observation, ...]:
+        if retrieved_at.tzinfo is None:
+            raise ValueError("retrieved_at precisa de timezone")
+        if self._endpoint is not None:
+            return self._fetch_injected_json(query, retrieved_at)
+
+        metadata = self._transport.get_json(self.package_url)
+        resource_url, modified_at = _treasury_csv_resource(metadata)
+        raw_csv = self._text_transport.get_text(resource_url)
+        csv_hash = hashlib.sha256(raw_csv.encode("utf-8")).hexdigest()
+        field, default_unit = self._fields.get(
+            query.series_id,
+            (query.series_id, query.parameter("unit", "provider-defined") or "provider-defined"),
+        )
+        unit = query.parameter("unit", default_unit) or default_unit
+        vintage_id = _vintage_id(self.provider_id, query, retrieved_at)
+        observations = []
+        for row in csv.DictReader(StringIO(raw_csv), delimiter=";"):
+            base_date = datetime.strptime(row["Data Base"], "%d/%m/%Y").date()
+            if query.start is not None and base_date < query.start:
+                continue
+            if query.end is not None and base_date > query.end:
+                continue
+            raw_value = str(row.get(field, "")).strip()
+            if not raw_value:
+                continue
+            effective = datetime.combine(base_date, datetime.min.time(), tzinfo=UTC)
+            maturity = datetime.strptime(row["Data Vencimento"], "%d/%m/%Y").date()
+            dimensions = (
+                ("instrument", row["Tipo Titulo"].strip()),
+                ("maturity", maturity.isoformat()),
+                ("provider_url", resource_url),
+            )
+            observations.append(
+                _observation(
+                    self.provider_id,
+                    query.series_id,
+                    raw_value.replace(".", "").replace(",", "."),
+                    unit,
+                    effective,
+                    retrieved_at,
+                    vintage_id,
+                    dimensions,
+                    {
+                        "row": row,
+                        "csv_sha256": csv_hash,
+                        "resource_last_modified": modified_at,
+                    },
+                )
+            )
+        return tuple(observations)
+
+    def _fetch_injected_json(
+        self, query: SeriesQuery, retrieved_at: datetime
+    ) -> tuple[Observation, ...]:
+        assert self._endpoint is not None
         payload = self._transport.get_json(self._endpoint)
         records = _find_records(payload)
         vintage_id = _vintage_id(self.provider_id, query, retrieved_at)
@@ -399,6 +502,35 @@ def _find_records(payload: list[dict[str, Any]] | dict[str, Any]) -> list[dict[s
             if nested:
                 return nested
     return []
+
+
+def _treasury_csv_resource(
+    payload: list[dict[str, Any]] | dict[str, Any],
+) -> tuple[str, str]:
+    if not isinstance(payload, dict) or payload.get("success") is not True:
+        raise ValueError("catálogo CKAN do Tesouro retornou resposta inválida")
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        raise ValueError("catálogo CKAN do Tesouro não contém result")
+    resources = result.get("resources")
+    if not isinstance(resources, list):
+        raise ValueError("catálogo CKAN do Tesouro não contém resources")
+    candidates = [
+        resource
+        for resource in resources
+        if isinstance(resource, dict)
+        and str(resource.get("format", "")).upper() == "CSV"
+        and str(resource.get("url", "")).startswith("https://")
+    ]
+    if not candidates:
+        raise ValueError("catálogo CKAN do Tesouro não contém recurso CSV HTTPS")
+    resource = max(
+        candidates,
+        key=lambda item: str(item.get("last_modified") or item.get("created") or ""),
+    )
+    return str(resource["url"]), str(
+        resource.get("last_modified") or result.get("metadata_modified") or "unknown"
+    )
 
 
 def _parse_datetime(value: str) -> datetime:

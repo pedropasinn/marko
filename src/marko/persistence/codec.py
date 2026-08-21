@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import cast
@@ -24,6 +24,7 @@ from marko.portfolio_lab import (
     ValidatedPortfolioCandidate,
 )
 from marko.research_registry import ModelRun, SolverRecord
+from marko.shadow import ShadowRunRequest
 from marko.temporal import Observation, TimeCoordinates
 
 type JsonValue = bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
@@ -53,7 +54,11 @@ class SerializationEnvelope:
 
     @classmethod
     def from_json(cls, value: str) -> SerializationEnvelope:
-        document = json.loads(value)
+        document = json.loads(
+            value,
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_json_constant,
+        )
         mapping = _mapping(document, "envelope")
         _exact_keys(mapping, {"schema", "version", "payload"}, "envelope")
         payload = _mapping(mapping.get("payload"), "payload")
@@ -250,7 +255,7 @@ def decode_model_run(envelope: SerializationEnvelope) -> ModelRun:
         },
     )
     validated_payload = payload.get("validated_candidate")
-    return ModelRun(
+    run = ModelRun(
         run_id=_text(payload.get("run_id"), "run_id"),
         created_at=_datetime(payload.get("created_at"), "created_at"),
         model_id=_text(payload.get("model_id"), "model_id"),
@@ -274,12 +279,14 @@ def decode_model_run(envelope: SerializationEnvelope) -> ModelRun:
         ),
         violations=_text_tuple(payload.get("violations"), "violations"),
     )
+    _validate_model_run(run)
+    return run
 
 
 def encode_decision_packet(packet: DecisionPacket) -> SerializationEnvelope:
     return SerializationEnvelope(
         "marko.decision_packet",
-        1,
+        3,
         {
             "packet_id": packet.packet_id,
             "created_at": packet.created_at.isoformat(),
@@ -288,24 +295,47 @@ def encode_decision_packet(packet: DecisionPacket) -> SerializationEnvelope:
             "model_runs": [_model_ref(reference) for reference in packet.model_runs],
             "evidence_ids": list(packet.evidence_ids),
             "alternatives": [_alternative(alternative) for alternative in packet.alternatives],
+            "shadow_request_id": packet.shadow_request_id,
+            "knowledge_cutoff": (
+                packet.knowledge_cutoff.isoformat() if packet.knowledge_cutoff is not None else None
+            ),
         },
     )
 
 
 def decode_decision_packet(envelope: SerializationEnvelope) -> DecisionPacket:
-    payload = _payload(
-        envelope,
-        "marko.decision_packet",
-        1,
-        {
-            "packet_id",
-            "created_at",
-            "policy_id",
-            "policy_version",
-            "model_runs",
-            "evidence_ids",
-            "alternatives",
-        },
+    common_keys = {
+        "packet_id",
+        "created_at",
+        "policy_id",
+        "policy_version",
+        "model_runs",
+        "evidence_ids",
+        "alternatives",
+    }
+    if envelope.schema != "marko.decision_packet" or envelope.version not in (1, 2, 3):
+        raise UnsupportedSchemaError(
+            f"contrato não suportado: {envelope.schema}@{envelope.version}; "
+            "esperado marko.decision_packet@1, @2 ou @3"
+        )
+    expected_keys = (
+        common_keys
+        if envelope.version == 1
+        else common_keys | {"shadow_request_id", "knowledge_cutoff"}
+    )
+    _exact_keys(
+        envelope.payload,
+        expected_keys,
+        f"marko.decision_packet@{envelope.version}.payload",
+    )
+    payload = envelope.payload
+    shadow_request_id = (
+        None if envelope.version == 1 else _optional_text(payload.get("shadow_request_id"))
+    )
+    knowledge_cutoff = (
+        None
+        if envelope.version == 1
+        else _optional_datetime(payload.get("knowledge_cutoff"), "knowledge_cutoff")
     )
     return DecisionPacket(
         packet_id=_text(payload.get("packet_id"), "packet_id"),
@@ -313,14 +343,48 @@ def decode_decision_packet(envelope: SerializationEnvelope) -> DecisionPacket:
         policy_id=_text(payload.get("policy_id"), "policy_id"),
         policy_version=_integer(payload.get("policy_version"), "policy_version"),
         model_runs=tuple(
-            _decode_model_ref(value) for value in _sequence(payload.get("model_runs"), "model_runs")
+            _decode_model_ref(value, envelope.version)
+            for value in _sequence(payload.get("model_runs"), "model_runs")
         ),
         evidence_ids=_text_tuple(payload.get("evidence_ids"), "evidence_ids"),
         alternatives=tuple(
             _decode_alternative(value)
             for value in _sequence(payload.get("alternatives"), "alternatives")
         ),
+        shadow_request_id=shadow_request_id,
+        knowledge_cutoff=knowledge_cutoff,
     )
+
+
+def encode_shadow_run_request(request: ShadowRunRequest) -> SerializationEnvelope:
+    _validate_shadow_request_identity(request)
+    return SerializationEnvelope(
+        "marko.shadow_run_request",
+        1,
+        {
+            "request_id": request.request_id,
+            "schedule_id": request.schedule_id,
+            "scheduled_for": request.scheduled_for.isoformat(),
+            "knowledge_cutoff": request.knowledge_cutoff.isoformat(),
+        },
+    )
+
+
+def decode_shadow_run_request(envelope: SerializationEnvelope) -> ShadowRunRequest:
+    payload = _payload(
+        envelope,
+        "marko.shadow_run_request",
+        1,
+        {"request_id", "schedule_id", "scheduled_for", "knowledge_cutoff"},
+    )
+    request = ShadowRunRequest(
+        request_id=_text(payload.get("request_id"), "request_id"),
+        schedule_id=_text(payload.get("schedule_id"), "schedule_id"),
+        scheduled_for=_datetime(payload.get("scheduled_for"), "scheduled_for"),
+        knowledge_cutoff=_datetime(payload.get("knowledge_cutoff"), "knowledge_cutoff"),
+    )
+    _validate_shadow_request_identity(request)
+    return request
 
 
 def _money(value: Money | None) -> dict[str, JsonValue] | None:
@@ -333,6 +397,7 @@ def _optional_money(value: object) -> Money | None:
     if value is None:
         return None
     mapping = _mapping(value, "money")
+    _exact_keys(mapping, {"amount", "currency"}, "money")
     return Money.of(
         _text(mapping.get("amount"), "money.amount"),
         _text(mapping.get("currency"), "money.currency"),
@@ -367,6 +432,11 @@ def _times(value: TimeCoordinates) -> dict[str, JsonValue]:
 
 def _decode_times(value: object) -> TimeCoordinates:
     mapping = _mapping(value, "times")
+    _exact_keys(
+        mapping,
+        {"effective_at", "observed_at", "available_at", "ingested_at"},
+        "times",
+    )
     return TimeCoordinates(
         _datetime(mapping.get("effective_at"), "times.effective_at"),
         _datetime(mapping.get("observed_at"), "times.observed_at"),
@@ -387,6 +457,11 @@ def _problem(value: PortfolioProblem) -> dict[str, JsonValue]:
 
 def _decode_problem(value: object) -> PortfolioProblem:
     mapping = _mapping(value, "problem")
+    _exact_keys(
+        mapping,
+        {"assets", "returns", "current_weights", "minimum_weights", "maximum_weights"},
+        "problem",
+    )
     returns = tuple(
         tuple(_number(item, "returns") for item in _sequence(row, "returns.row"))
         for row in _sequence(mapping.get("returns"), "returns")
@@ -414,6 +489,19 @@ def _candidate(value: PortfolioCandidate) -> dict[str, JsonValue]:
 
 def _decode_candidate(value: object) -> PortfolioCandidate:
     mapping = _mapping(value, "candidate")
+    _exact_keys(
+        mapping,
+        {
+            "model_id",
+            "assets",
+            "weights",
+            "expected_return",
+            "volatility",
+            "solver_status",
+            "diagnostics",
+        },
+        "candidate",
+    )
     return PortfolioCandidate(
         _text(mapping.get("model_id"), "candidate.model_id"),
         _text_tuple(mapping.get("assets"), "candidate.assets"),
@@ -431,6 +519,7 @@ def _validated_candidate(value: ValidatedPortfolioCandidate) -> dict[str, JsonVa
 
 def _decode_validated_candidate(value: object) -> ValidatedPortfolioCandidate:
     mapping = _mapping(value, "validated_candidate")
+    _exact_keys(mapping, {"candidate", "problem"}, "validated_candidate")
     return ValidatedPortfolioCandidate(
         _decode_candidate(mapping.get("candidate")),
         _decode_problem(mapping.get("problem")),
@@ -448,6 +537,11 @@ def _solver(value: SolverRecord) -> dict[str, JsonValue]:
 
 def _decode_solver(value: object) -> SolverRecord:
     mapping = _mapping(value, "solver")
+    _exact_keys(
+        mapping,
+        {"solver_id", "version", "tolerances", "capabilities"},
+        "solver",
+    )
     tolerances = tuple(
         (
             _text(_sequence(item, "solver.tolerance")[0], "solver.tolerance.key"),
@@ -464,14 +558,72 @@ def _decode_solver(value: object) -> SolverRecord:
 
 
 def _model_ref(value: ValidatedModelRunRef) -> dict[str, JsonValue]:
-    return {"run_id": value.run_id, "candidate": _validated_candidate(value.candidate)}
+    if value.run_payload_hash is None or value.dataset_fingerprint is None:
+        raise ValueError("DecisionPacket@3 exige referência verificável de ModelRun")
+    return {
+        "run_id": value.run_id,
+        "run_payload_hash": value.run_payload_hash,
+        "dataset_fingerprint": value.dataset_fingerprint,
+        "candidate_hash": value.candidate_hash,
+        "validation_witness": value.validation_witness,
+        "dataset_available_at": (
+            value.dataset_available_at.isoformat()
+            if value.dataset_available_at is not None
+            else None
+        ),
+    }
 
 
-def _decode_model_ref(value: object) -> ValidatedModelRunRef:
+def _decode_model_ref(value: object, packet_version: int) -> ValidatedModelRunRef:
     mapping = _mapping(value, "model_ref")
-    return ValidatedModelRunRef(
-        _text(mapping.get("run_id"), "model_ref.run_id"),
-        _decode_validated_candidate(mapping.get("candidate")),
+    if packet_version == 1:
+        expected_keys = {"run_id", "candidate"}
+    elif packet_version == 2:
+        expected_keys = {
+            "run_id",
+            "candidate",
+            "dataset_fingerprint",
+            "dataset_available_at",
+        }
+    else:
+        expected_keys = {
+            "run_id",
+            "run_payload_hash",
+            "dataset_fingerprint",
+            "candidate_hash",
+            "validation_witness",
+            "dataset_available_at",
+        }
+    _exact_keys(mapping, expected_keys, "model_ref")
+    run_id = _text(mapping.get("run_id"), "model_ref.run_id")
+    if packet_version < 3:
+        return ValidatedModelRunRef._from_legacy(
+            run_id=run_id,
+            candidate=_decode_validated_candidate(mapping.get("candidate")),
+            dataset_fingerprint=(
+                None if packet_version == 1 else _optional_text(mapping.get("dataset_fingerprint"))
+            ),
+            dataset_available_at=(
+                None
+                if packet_version == 1
+                else _optional_datetime(
+                    mapping.get("dataset_available_at"), "model_ref.dataset_available_at"
+                )
+            ),
+        )
+    return ValidatedModelRunRef._from_persisted(
+        run_id=run_id,
+        run_payload_hash=_sha256(mapping.get("run_payload_hash"), "model_ref.run_payload_hash"),
+        dataset_fingerprint=_text(
+            mapping.get("dataset_fingerprint"), "model_ref.dataset_fingerprint"
+        ),
+        candidate_hash=_sha256(mapping.get("candidate_hash"), "model_ref.candidate_hash"),
+        validation_witness=_sha256(
+            mapping.get("validation_witness"), "model_ref.validation_witness"
+        ),
+        dataset_available_at=_optional_datetime(
+            mapping.get("dataset_available_at"), "model_ref.dataset_available_at"
+        ),
     )
 
 
@@ -487,6 +639,11 @@ def _trade(value: TradeProposal) -> dict[str, JsonValue]:
 
 def _decode_trade(value: object) -> TradeProposal:
     mapping = _mapping(value, "trade")
+    _exact_keys(
+        mapping,
+        {"instrument_id", "side", "quantity", "notional", "estimated_cost"},
+        "trade",
+    )
     notional = _optional_money(mapping.get("notional"))
     estimated_cost = _optional_money(mapping.get("estimated_cost"))
     if notional is None or estimated_cost is None:
@@ -514,6 +671,19 @@ def _alternative(value: DecisionAlternative) -> dict[str, JsonValue]:
 
 def _decode_alternative(value: object) -> DecisionAlternative:
     mapping = _mapping(value, "alternative")
+    _exact_keys(
+        mapping,
+        {
+            "alternative_id",
+            "trades",
+            "projected_weights",
+            "unallocated_cash",
+            "turnover",
+            "feasible",
+            "reasons",
+        },
+        "alternative",
+    )
     unallocated = _optional_money(mapping.get("unallocated_cash"))
     if unallocated is None:
         raise ValueError("alternative exige unallocated_cash")
@@ -552,9 +722,7 @@ def _decode_decimal_pairs(value: object, name: str) -> tuple[tuple[str, Decimal]
         item = _sequence(raw, f"{name}.item")
         if len(item) != 2:
             raise ValueError(f"{name} exige pares")
-        pairs.append(
-            (_text(item[0], f"{name}.key"), _required_decimal(item[1], f"{name}.value"))
-        )
+        pairs.append((_text(item[0], f"{name}.key"), _required_decimal(item[1], f"{name}.value")))
     return tuple(pairs)
 
 
@@ -599,6 +767,13 @@ def _text(value: object, name: str) -> str:
     return value
 
 
+def _sha256(value: object, name: str) -> str:
+    result = _text(value, name)
+    if len(result) != 64 or any(character not in "0123456789abcdef" for character in result):
+        raise ValueError(f"{name} precisa ser SHA-256 hexadecimal")
+    return result
+
+
 def _optional_text(value: object) -> str | None:
     if value is None:
         return None
@@ -633,9 +808,87 @@ def _datetime(value: object, name: str) -> datetime:
     return result
 
 
+def _optional_datetime(value: object, name: str) -> datetime | None:
+    return None if value is None else _datetime(value, name)
+
+
 def _text_tuple(value: object, name: str) -> tuple[str, ...]:
     return tuple(_text(item, f"{name}.item") for item in _sequence(value, name))
 
 
 def _number_tuple(value: object, name: str) -> tuple[float, ...]:
     return tuple(_number(item, f"{name}.item") for item in _sequence(value, name))
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"chave JSON duplicada: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"constante JSON inválida: {value}")
+
+
+def _validate_model_run(run: ModelRun) -> None:
+    required = (
+        run.run_id,
+        run.model_id,
+        run.code_version,
+        run.environment_fingerprint,
+        run.dataset_fingerprint,
+        run.policy_id,
+        run.universe_id,
+        run.solver.solver_id,
+        run.solver.version,
+    )
+    if any(not value.strip() for value in required):
+        raise ValueError("ModelRun contém identidade vazia")
+    if run.created_at.tzinfo is None:
+        raise ValueError("ModelRun.created_at precisa de timezone")
+    if run.policy_version <= 0 or run.universe_version <= 0:
+        raise ValueError("versões de policy e universe precisam ser positivas")
+    parameter_keys = [key for key, _ in run.parameters]
+    tolerance_keys = [key for key, _ in run.solver.tolerances]
+    if len(parameter_keys) != len(set(parameter_keys)):
+        raise ValueError("ModelRun contém parâmetros duplicados")
+    if len(tolerance_keys) != len(set(tolerance_keys)):
+        raise ValueError("ModelRun contém tolerâncias duplicadas")
+    if run.parameters != tuple(sorted(run.parameters)):
+        raise ValueError("parâmetros do ModelRun não estão em ordem canônica")
+    if run.candidate.model_id != run.model_id:
+        raise ValueError("model_id diverge do candidato")
+    if run.validated_candidate is not None:
+        if run.validated_candidate.candidate != run.candidate or run.violations:
+            raise ValueError("candidato validado diverge do ModelRun")
+    elif not run.violations:
+        raise ValueError("ModelRun sem candidato validado precisa registrar violações")
+    identity = {
+        "created_at": run.created_at.isoformat(),
+        "model": run.candidate.model_id,
+        "code": run.code_version,
+        "dataset": run.dataset_fingerprint,
+        "policy": [run.policy_id, run.policy_version],
+        "universe": [run.universe_id, run.universe_version],
+        "parameters": run.parameters,
+        "seed": run.random_seed,
+        "solver": asdict(run.solver),
+        "environment": run.environment_fingerprint,
+        "candidate": asdict(run.candidate),
+    }
+    expected_id = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    if run.run_id != expected_id:
+        raise ValueError("run_id diverge da identidade semântica do ModelRun")
+
+
+def _validate_shadow_request_identity(request: ShadowRunRequest) -> None:
+    canonical = ShadowRunRequest.create(
+        request.schedule_id,
+        request.scheduled_for,
+        request.knowledge_cutoff,
+    )
+    if request.request_id != canonical.request_id:
+        raise ValueError("request_id diverge da identidade canônica do ShadowRunRequest")

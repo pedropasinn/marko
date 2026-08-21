@@ -14,7 +14,7 @@ Não existe autorização para investir, recomendar uma carteira real ou enviar 
 
 ## Estado atual
 
-O pacote está na versão `0.3.0`. Foram concluídos:
+Este permanece o documento canônico de contexto operacional do projeto. O pacote está na versão `0.3.1` — Operational Integrity. Foram concluídos:
 
 1. arqueologia de onze projetos open source;
 2. kernel contábil e de política;
@@ -28,26 +28,30 @@ O pacote está na versão `0.3.0`. Foram concluídos:
 10. cash-flow rebalancing sem vendas;
 11. reversões contábeis refletidas nos lotes por `as_of`;
 12. valuation completo/incompleto com proveniência;
-13. candidatos pós-validados obrigatórios na decisão.
+13. candidatos pós-validados obrigatórios na decisão;
 14. contratos de serialização JSON canônicos e versionados;
 15. portas de repositório sem dependência de driver no domínio;
 16. PostgreSQL append-only para Activity, Observation, ModelRun e DecisionPacket;
 17. datasets Parquet imutáveis para observações;
 18. migrações com advisory lock e checksum;
 19. backup verificado e restore idempotente;
-20. scheduler shadow e reconciliação de referências ponto-no-tempo.
-21. casos dourados de TWR com aportes, transferências, FX e corporate actions.
+20. scheduler shadow e reconciliação de referências ponto-no-tempo;
+21. casos dourados de TWR com aportes, transferências, FX e corporate actions;
+22. `ShadowRunRequest` persistido e `knowledge_cutoff` propagado ao DecisionPacket;
+23. ciclo shadow append-only, reconciliação de datasets e benchmarks CDI/1/N;
+24. backup privado AES-256-GCM, restore pré-validado, codecs estritos e Parquet endurecido;
+25. Read API e Marko Console React/TypeScript/PWA somente leitura;
+26. deploy público exclusivamente sintético do Console e da API.
 
 Validação atual:
 
-- 92 testes locais aprovados, 2 integrações condicionais e 84% de cobertura;
-- Ruff aprovado;
-- MyPy estrito aprovado;
-- Parquet exercitado localmente;
-- PostgreSQL 16 e Parquet aprovados no job dedicado do CI;
-- BCB/SGS e IBGE/SIDRA exercitados ao vivo;
-- adapters skfolio e PyPortfolioOpt retornando candidatos factíveis;
-- onze snapshots upstream limpos e oito spikes reproduzíveis preservados.
+- o CI exige Ruff, MyPy estrito, cobertura mínima de 80%, build e smoke do wheel;
+- PostgreSQL 16/Parquet permanecem no job dedicado;
+- o Console passa por `npm ci`, typecheck, testes e build;
+- BCB/SGS e IBGE/SIDRA foram exercitados ao vivo;
+- o Tesouro Direto usa o catálogo CKAN oficial do Tesouro Transparente;
+- adapters skfolio e PyPortfolioOpt permanecem no gate opcional;
+- onze snapshots upstream e oito spikes reproduzíveis foram preservados.
 
 ## Três verdades separadas
 
@@ -131,14 +135,14 @@ Providers:
 
 - BCB/SGS operacional;
 - IBGE/SIDRA operacional;
-- Tesouro Direto com endpoint JSON injetável;
+- Tesouro Direto com descoberta do CSV pelo CKAN oficial do Tesouro Transparente e endpoint JSON injetável apenas como seam;
 - ANBIMA e B3 com endpoint, schema e token injetáveis;
 - calendário de dias úteis;
 - store idempotente com consultas `as_known_at` e revisão mais recente.
 
 As respostas BCB/SIDRA consultadas não expõem o instante histórico de publicação. O adapter usa a ingestão como disponibilidade conservadora e marca `availability_conservative`.
 
-O endpoint JSON legado do Tesouro Direto respondeu HTTP 410. Não foi inventado um substituto. ANBIMA/B3 ainda precisam de credenciais e contratos atuais.
+O provider do Tesouro seleciona o recurso CSV HTTPS mais recente do pacote oficial, normaliza os decimais pt-BR e preserva URL, modificação e hash do arquivo. ANBIMA/B3 ainda precisam de credenciais e contratos atuais; continuam bloqueados para smoke real.
 
 ### `portfolio_lab.py`
 
@@ -206,20 +210,34 @@ O resultado não altera ledger nem envia ordens.
 
 Contém:
 
-- portas para Activity, Observation, ModelRun e DecisionPacket;
+- portas para Activity, Observation, ModelRun, ShadowRunRequest e DecisionPacket;
 - codecs explícitos `schema@version` com JSON canônico e SHA-256;
 - `PostgresStore` com append idempotente, conflito por hash e leitura verificada;
 - migrações SQL numeradas, transacionais, serializadas e protegidas por checksum;
-- `ParquetObservationStore` para datasets imutáveis de pesquisa;
-- backup atômico, verificação de hash e restore idempotente.
+- `ParquetObservationStore` para datasets imutáveis de pesquisa, com round trip e validação das colunas derivadas;
+- backup privado v4 com AES-256-GCM e chave externa, leitura legada v1–v3/HMAC, verificação semântica e restore idempotente/atômico no PostgreSQL.
 
 PostgreSQL é a fonte operacional. Parquet não sobrescreve Accounting ou Decision Truth.
 
-### `shadow.py`
+### `shadow.py` e `shadow_operation.py`
 
-Agenda ciclos mensais de modo determinístico, preservando timezone, instante agendado e `knowledge_cutoff`. A reconciliação exige ModelRuns exatos e rejeita evidência que ainda não estava disponível quando o DecisionPacket foi criado.
+Agenda ciclos mensais de modo determinístico e cria `ShadowRunRequest` com identidade canônica, instante agendado e `knowledge_cutoff`. O DecisionPacket preserva esse vínculo. A reconciliação exige ModelRuns e fingerprints de dataset exatos e rejeita evidência que ainda não estava disponível no corte.
+
+O registro operacional liga request, snapshot, vintages, ModelRuns, DecisionPacket e reconciliação a um diário append-only com cadeia de hashes. Benchmarks calculam TWR, drawdown e drift para carteira observada, CDI e 1/N, mantendo ausências como falhas explícitas.
 
 O módulo não aprova nem executa operações.
+
+### `read_api/` e `apps/console/`
+
+A Read API FastAPI expõe somente `GET` para status, Activities, Observations no corte `known_at`, ModelRuns e DecisionPackets. DTOs omitem estruturas internas desnecessárias, coleções têm limite, CORS é configurável e erros internos são sanitizados. Modo PostgreSQL exige DSN; não cai silenciosamente para demo.
+
+O Marko Console é uma PWA React/TypeScript somente leitura. Diferencia dados sintéticos, fonte HTTP e indisponibilidade; falha HTTP não ativa fixture local. A direção de UX foi inspirada em padrões estudados no Ghostfolio e no Untitled UI, sem copiar código ou identidade visual.
+
+Deploys públicos: `https://marko-console.vercel.app` e `https://marko-api.vercel.app`. Ambos são sintéticos. O Neon contém exclusivamente dados sintéticos em `gru1`, com Neon Auth habilitada; dados reais continuam proibidos até autenticação efetiva e IPS privado.
+
+O Console privado obtém JWT pelo contrato oficial do Neon Auth. A Read API valida tokens EdDSA pelo JWKS do Neon, exige `sub`/expiração e aplica allowlist. O deploy continua em `MARKO_AUTH_MODE=public` até as duas identidades serem cadastradas fora do Git; ele não pode receber dados reais.
+
+O runtime da Read API usa uma role PostgreSQL dedicada com somente `SELECT` e `default_transaction_read_only=on`. A credencial proprietária fica reservada a migrações e ao seed sintético.
 
 ## Upstreams estudados
 
@@ -273,14 +291,16 @@ uv sync --group dev
 uv run pytest --cov=marko --cov-report=term-missing
 uv run ruff check .
 uv run mypy
+uv build
 uv run marko status
 uv run marko fetch-bcb 1178 --start 2026-08-18 --end 2026-08-19 --unit "% a.a."
 uv run marko fetch-sidra IPCA --table 1737 --variable 2266 --period "last 1"
 uv sync --group dev --extra persistence
 MARKO_DATABASE_URL=postgresql://... uv run marko db-migrate
-MARKO_DATABASE_URL=postgresql://... uv run marko backup var/private/backup.json
+MARKO_DATABASE_URL=postgresql://... MARKO_BACKUP_ENCRYPTION_KEY=... uv run marko backup --private var/private/backup.json
 uv run marko backup-verify var/private/backup.json
 uv run marko shadow-due --day 20 --after 2026-07-20T13:00:00+00:00 --until 2026-08-20T13:00:00+00:00
+cd apps/console && npm ci && npm run typecheck && npm test && npm run build
 ```
 
 ## Informações ainda necessárias do proprietário
@@ -303,7 +323,7 @@ Somente depois disso gerar IPS real. Mesmo com o IPS completo, capital real cont
 
 1. obter os nove dados pessoais em configuração privada e gerar IPS/Liability;
 2. implementar regras fiscais brasileiras por instrumento/prazo;
-3. configurar endpoints/credenciais de Tesouro, ANBIMA e B3;
+3. configurar credenciais e contratos de ANBIMA e B3; o Tesouro já usa o CKAN oficial;
 4. definir benchmarks, periodicidade e duração mínima da operação shadow;
 5. operar shadow portfolio com CDI, 1/N e carteira real como benchmarks;
 6. só então avançar para Black–Litterman, HRP/HERC/NCO, CVaR/CDaR e ensemble dentro do produto.
@@ -323,3 +343,4 @@ Somente depois disso gerar IPS real. Mesmo com o IPS completo, capital real cont
 - nunca reescrever um fato persistido para corrigir o histórico;
 - nunca restaurar backup ou dataset sem verificar schema e hash;
 - nunca executar ciclo shadow com evidência posterior ao DecisionPacket.
+- nunca inserir dados reais no Console, na API ou no Neon público antes de autenticação efetiva e IPS privado.

@@ -10,6 +10,7 @@ from marko.data_gateway import (
     ObservationStore,
     SeriesQuery,
     SidraProvider,
+    TextTransport,
     TreasuryDirectProvider,
 )
 
@@ -22,6 +23,16 @@ class FakeTransport(JsonTransport):
         self.url = ""
 
     def get_json(self, url: str, headers=None):  # type: ignore[no-untyped-def]
+        self.url = url
+        return self.payload
+
+
+class FakeTextTransport(TextTransport):
+    def __init__(self, payload: str) -> None:
+        self.payload = payload
+        self.url = ""
+
+    def get_text(self, url: str, headers=None):  # type: ignore[no-untyped-def]
         self.url = url
         return self.payload
 
@@ -111,6 +122,65 @@ def test_treasury_adapter_handles_nested_records_without_fixed_endpoint() -> Non
     ).fetch(SeriesQuery("buy_rate", parameters=(("unit", "ratio/year"),)), NOW)
     assert observations[0].value == Decimal("0.12")
     assert ("instrument", "Tesouro Selic") in observations[0].dimensions
+
+
+def test_treasury_adapter_discovers_official_ckan_csv_and_normalizes_pt_br() -> None:
+    csv_url = "https://tesouro.example/precotaxatesourodireto.csv"
+    metadata = {
+        "success": True,
+        "result": {
+            "metadata_modified": "2026-08-20T10:21:10",
+            "resources": [
+                {
+                    "format": "CSV",
+                    "url": csv_url,
+                    "last_modified": "2026-08-20T10:21:10",
+                }
+            ],
+        },
+    }
+    raw_csv = (
+        "Tipo Titulo;Data Vencimento;Data Base;Taxa Compra Manha;Taxa Venda Manha;"
+        "PU Compra Manha;PU Venda Manha;PU Base Manha\n"
+        "Tesouro Selic;01/03/2029;19/08/2026;0,1200;0,1300;15.432,10;15.410,20;"
+        "15.421,00\n"
+        "Tesouro IPCA+;15/05/2035;18/08/2026;6,5000;6,6000;3.210,11;3.200,00;"
+        "3.205,00\n"
+    )
+    json_transport = FakeTransport(metadata)
+    text_transport = FakeTextTransport(raw_csv)
+
+    observations = TreasuryDirectProvider(
+        transport=json_transport,
+        text_transport=text_transport,
+    ).fetch(
+        SeriesQuery("buy_price", start=date(2026, 8, 19), end=date(2026, 8, 19)),
+        NOW,
+    )
+
+    assert json_transport.url == TreasuryDirectProvider.package_url
+    assert text_transport.url == csv_url
+    assert len(observations) == 1
+    assert observations[0].value == Decimal("15432.10")
+    assert observations[0].unit == "BRL"
+    assert observations[0].times.effective_at == datetime(2026, 8, 19, tzinfo=UTC)
+    assert ("maturity", "2029-03-01") in observations[0].dimensions
+    assert observations[0].quality_flags == ("availability_conservative",)
+
+
+def test_treasury_adapter_rejects_catalog_without_https_csv() -> None:
+    provider = TreasuryDirectProvider(
+        transport=FakeTransport(
+            {"success": True, "result": {"resources": [{"format": "JSON", "url": "x"}]}}
+        ),
+        text_transport=FakeTextTransport(""),
+    )
+    try:
+        provider.fetch(SeriesQuery("buy_rate"), NOW)
+    except ValueError as error:
+        assert "recurso CSV HTTPS" in str(error)
+    else:
+        raise AssertionError("catálogo inválido deveria falhar fechado")
 
 
 def test_authenticated_provider_normalizes_iso_timestamp() -> None:

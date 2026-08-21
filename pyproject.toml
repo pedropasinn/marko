@@ -4,10 +4,16 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marko"
-version = "0.3.0"
+version = "0.3.1"
 description = "Núcleo auditável de um gestor quantitativo pessoal orientado a passivos"
 requires-python = ">=3.12"
-dependencies = ["numpy>=2.0"]
+dependencies = [
+  "cryptography==50.0.0",
+  "fastapi==0.141.1",
+  "numpy>=2.0",
+  "psycopg[binary]==3.3.4",
+  "pyjwt[crypto]==2.13.0",
+]
 
 [project.optional-dependencies]
 research = [
@@ -15,8 +21,10 @@ research = [
   "skfolio==0.20.2",
 ]
 persistence = [
-  "psycopg[binary]==3.3.4",
   "pyarrow==25.0.1",
+]
+api = [
+  "uvicorn==0.52.4",
 ]
 
 [project.scripts]
@@ -24,6 +32,7 @@ marko = "marko.__main__:main"
 
 [dependency-groups]
 dev = [
+  "httpx==0.28.1",
   "mypy>=1.17",
   "pytest>=8.4",
   "pytest-cov>=6.2",

@@ -1,10 +1,10 @@
 # Estado do Marko
 
-Atualizado em 20/08/2026. Versão atual: `0.3.0`.
+Atualizado em 20/08/2026. Versão atual: `0.3.1` — Operational Integrity.
 
 ## Em uma frase
 
-O Marko já persiste fatos contábeis, dados ponto-no-tempo, pesquisa e decisões em contratos auditáveis e prepara ciclos shadow; ainda não recomenda nem executa capital real.
+O Marko persiste fatos contábeis, dados ponto-no-tempo, pesquisa, solicitações e decisões shadow em contratos auditáveis, e os expõe por API e Console somente leitura; capital real e dados reais continuam bloqueados.
 
 ## Gates
 
@@ -14,30 +14,29 @@ O Marko já persiste fatos contábeis, dados ponto-no-tempo, pesquisa e decisõe
 | Accounting kernel | concluído | reversões derivadas, activity matrix e lotes `as_of` |
 | Analytics e reconciliação | concluído no corte atual | valuation falha fechado e atribuição separa principal |
 | Configuração pessoal | aguardando dados | `uv run marko status` lista nove campos |
-| Data Gateway | parcial operacional | BCB/SGS e SIDRA ao vivo; demais aguardam acesso |
+| Data Gateway | parcial operacional | BCB/SGS e SIDRA ao vivo; Tesouro Direto usa o CKAN oficial; ANBIMA/B3 aguardam credenciais |
 | Baseline Portfolio Lab | concluído | cinco baselines e adapters opcionais testáveis no CI |
 | Validation Framework | concluído no corte atual | candidato validado, drift, step e PSD explícitos |
 | Decision Engine | concluído no corte atual | caixa explícito e ModelRun validado |
-| Persistência | concluída | PostgreSQL 16 validado no CI; Parquet, codecs, migrações e backup implementados |
-| Shadow portfolio | readiness concluída | scheduler mensal e reconciliação PIT validados; operação depende de IPS |
+| Persistência | endurecida | backup privado AES-256-GCM, restore validado, codecs estritos e Parquet verificado |
+| Shadow portfolio | integridade operacional concluída | `ShadowRunRequest`, `knowledge_cutoff`, diário append-only, reconciliação PIT e benchmarks sintéticos |
+| Read API | concluída no corte atual | `/api/v1` somente leitura, modo demo explícito, erros sanitizados e CORS restrito |
+| Marko Console | concluído no corte atual | React/TypeScript/PWA; estados sintético, HTTP e indisponível sem fallback enganoso |
+| Deploy público | sintético | Console e API na Vercel; Neon exclusivamente sintético em `gru1`; API usa role PostgreSQL somente leitura |
 | Capital real | bloqueado | depende de todos os gates e revisão humana |
 
 ## Agora
 
-1. receber os dados ainda ausentes do caso pessoal em configuração privada;
-2. configurar Tesouro Direto, ANBIMA e B3;
-3. definir benchmarks e duração mínima da operação shadow;
-4. iniciar ciclos shadow sem capital real;
+1. cadastrar as duas identidades fora do Git e ativar o modo privado já implementado;
+2. receber os dados ainda ausentes e gerar o IPS apenas em configuração privada;
+3. obter as credenciais e contratos atuais de ANBIMA e B3;
+4. definir duração mínima e iniciar ciclos shadow sem capital real;
 5. manter capital real bloqueado até revisão humana e histórico operacional suficiente.
 
 ## Qualidade
 
-```text
-92 testes locais aprovados, 2 integrações condicionais
-84% de cobertura
-Ruff aprovado
-MyPy strict aprovado
-PostgreSQL 16/Parquet aprovados em job próprio; skfolio e PyPortfolioOpt em job opcional
-```
+O CI preserva Ruff, MyPy strict, cobertura mínima de 80%, integração PostgreSQL/Parquet, adapters opcionais e smokes de providers. A versão `0.3.1` acrescenta build e smoke do wheel, além de `npm ci`, typecheck, testes e build do Console. A validação local atual tem 156 testes aprovados, 3 integrações condicionais ignoradas e 82,77% de cobertura.
+
+Ambiente público: [Console](https://marko-console.vercel.app) e [Read API](https://marko-api.vercel.app/api/v1/status). Ambos são sintéticos; Neon Auth apenas habilitada não autoriza ingestão de dados reais.
 
 O roadmap completo está em [`docs/roadmap.md`](docs/roadmap.md). O contexto para agentes e revisores está em [`docs/HANDOFF_GPT_PRO.md`](docs/HANDOFF_GPT_PRO.md).

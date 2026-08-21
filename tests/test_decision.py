@@ -74,6 +74,36 @@ def test_decision_packet_rejects_missing_no_action() -> None:
         )
 
 
+def test_shadow_decision_context_is_atomic_and_precedes_packet_creation() -> None:
+    created_at = datetime(2026, 8, 20, 12, tzinfo=UTC)
+    common = {
+        "packet_id": "packet",
+        "created_at": created_at,
+        "policy_id": "ips",
+        "policy_version": 1,
+        "model_runs": (),
+        "evidence_ids": (),
+        "alternatives": (
+            DecisionAlternative("no_action", (), (), Money.zero("BRL"), Decimal(0), True, ()),
+        ),
+    }
+    with pytest.raises(ValueError, match="informados juntos"):
+        DecisionPacket(**common, shadow_request_id="request")
+    with pytest.raises(ValueError, match="não pode suceder"):
+        DecisionPacket(
+            **common,
+            shadow_request_id="request",
+            knowledge_cutoff=datetime(2026, 8, 20, 13, tzinfo=UTC),
+        )
+    packet = DecisionPacket(
+        **common,
+        shadow_request_id="request",
+        knowledge_cutoff=created_at,
+    )
+    assert packet.shadow_request_id == "request"
+    assert packet.knowledge_cutoff == created_at
+
+
 def test_ips_liquidity_can_block_a_draft_without_hiding_it() -> None:
     packet = CashFlowRebalancer().build_packet(
         packet_id="decision-2",
