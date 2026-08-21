@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marko"
-version = "0.3.1"
+version = "0.3.2"
 description = "Núcleo auditável de um gestor quantitativo pessoal orientado a passivos"
 requires-python = ">=3.12"
 dependencies = [
@@ -41,6 +41,25 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/marko"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/README.md",
+  "/CHANGELOG.md",
+  "/CONTEXT.md",
+  "/SECURITY.md",
+  "/pyproject.toml",
+]
+exclude = [
+  "**/.env*",
+  "**/.vercel/**",
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/var/private/**",
+  "**/data/private/**",
+]
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers --strict-config"

@@ -22,6 +22,12 @@ Estado: concluída em 20/08/2026.
 
 Persistência de `ShadowRunRequest`, ciclos completos e `knowledge_cutoff`, diário operacional shadow append-only, benchmarks e falhas explícitas, referências compactas de `ModelRun`, backup privado AES-256-GCM, hardening de restore/codecs/Parquet, Read API somente leitura, Marko Console React/TypeScript/PWA e deploy público exclusivamente sintético.
 
+### v0.3.2 — Packaging Integrity
+
+Estado: concluída em 20/08/2026.
+
+Source distribution minimalista, sem dependências ou builds do Console, com inspeção automática de tamanho, arquivos de ambiente, artefatos de deploy e áreas privadas no CI.
+
 ### v0.4.0 — Personal IPS and Shadow Operation
 
 Estado: aguardando informações e acessos do proprietário.

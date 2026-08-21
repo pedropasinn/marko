@@ -4,6 +4,13 @@ As mudanças relevantes do Marko serão registradas aqui por versão.
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-08-20
+
+### Corrigido
+
+- o source distribution agora contém somente o pacote Python, testes e documentos essenciais;
+- o CI bloqueia pacotes com dependências do Console, arquivos de ambiente, artefatos da Vercel, áreas privadas ou tamanho anormal.
+
 ## [0.3.1] — 2026-08-20
 
 ### Adicionado
