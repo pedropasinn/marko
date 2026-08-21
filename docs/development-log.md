@@ -75,6 +75,12 @@
 
 A publicação tornou a fronteira de segurança mais explícita: Neon Auth habilitada não basta. Dados reais permanecem proibidos até autenticação efetiva e IPS privado.
 
+## 20/08/2026 — Marko 0.3.2 Packaging Integrity
+
+- o sdist foi reduzido ao pacote Python, testes e documentos essenciais;
+- dependências, builds e configuração local do Console ficaram fora do artefato Python;
+- o CI passou a rejeitar source distributions anormais ou contendo caminhos de ambiente, deploy e dados privados.
+
 ## Como este diário evolui
 
 Cada versão deve registrar decisões, resultados negativos, incompatibilidades e dívidas técnicas. O changelog descreve o que mudou; este diário explica por que a direção mudou.

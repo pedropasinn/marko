@@ -316,7 +316,7 @@ function Console({
           <Shadow data={state.data} />
         </main>
       )}
-      <footer><span>MARKO / CONSOLE 0.3.1</span><span>READ ONLY · {state.phase === 'ready' ? formatDate(state.data.status.as_of) : 'aguardando fonte'}</span></footer>
+      <footer><span>MARKO / CONSOLE 0.3.2</span><span>READ ONLY · {state.phase === 'ready' ? formatDate(state.data.status.as_of) : 'aguardando fonte'}</span></footer>
     </div>
   )
 }

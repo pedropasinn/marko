@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/pedropasinn/marko/actions/workflows/ci.yml/badge.svg)](https://github.com/pedropasinn/marko/actions/workflows/ci.yml)
 
-Núcleo auditável de um gestor quantitativo pessoal orientado a passivos. A versão `0.3.1` — Operational Integrity — cobre Accounting/Policy, dados ponto-no-tempo, baselines, validação, persistência append-only, ciclos shadow rastreáveis e uma superfície pública estritamente de leitura. O Marko não recomenda nem executa investimentos reais.
+Núcleo auditável de um gestor quantitativo pessoal orientado a passivos. A versão `0.3.2` cobre Accounting/Policy, dados ponto-no-tempo, baselines, validação, persistência append-only, ciclos shadow rastreáveis, uma superfície pública estritamente de leitura e empacotamento verificável. O Marko não recomenda nem executa investimentos reais.
 
 ## Demonstração pública
 

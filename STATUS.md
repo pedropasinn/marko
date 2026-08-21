@@ -1,6 +1,6 @@
 # Estado do Marko
 
-Atualizado em 20/08/2026. Versão atual: `0.3.1` — Operational Integrity.
+Atualizado em 20/08/2026. Versão atual: `0.3.2` — Packaging Integrity.
 
 ## Em uma frase
 
@@ -35,7 +35,7 @@ O Marko persiste fatos contábeis, dados ponto-no-tempo, pesquisa, solicitaçõe
 
 ## Qualidade
 
-O CI preserva Ruff, MyPy strict, cobertura mínima de 80%, integração PostgreSQL/Parquet, adapters opcionais e smokes de providers. A versão `0.3.1` acrescenta build e smoke do wheel, além de `npm ci`, typecheck, testes e build do Console. A validação local atual tem 156 testes aprovados, 3 integrações condicionais ignoradas e 82,77% de cobertura.
+O CI preserva Ruff, MyPy strict, cobertura mínima de 80%, integração PostgreSQL/Parquet, adapters opcionais e smokes de providers. A versão `0.3.2` também inspeciona conteúdo e tamanho do source distribution; wheel e Console continuam com build e smoke próprios. A validação local atual tem 156 testes aprovados, 3 integrações condicionais ignoradas e 82,77% de cobertura.
 
 Ambiente público: [Console](https://marko-console.vercel.app) e [Read API](https://marko-api.vercel.app/api/v1/status). Ambos são sintéticos; Neon Auth apenas habilitada não autoriza ingestão de dados reais.
 

@@ -37,6 +37,12 @@ jobs:
         run: uv run pytest --cov=marko --cov-report=term-missing --cov-fail-under=80
       - name: Build package
         run: uv build
+      - name: Inspect source distribution
+        run: |
+          archive="$(find dist -maxdepth 1 -name 'marko-*.tar.gz' -print -quit)"
+          test -n "$archive"
+          test "$(stat -c %s "$archive")" -lt 5000000
+          ! tar -tzf "$archive" | grep -E '(^|/)(node_modules|\.vercel|var/private|data/private)(/|$)|(^|/)\.env([^/]*$|/)'
       - name: Install and test wheel
         run: |
           uv venv /tmp/marko-wheel-test

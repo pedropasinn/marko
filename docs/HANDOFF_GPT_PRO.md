@@ -14,7 +14,7 @@ Não existe autorização para investir, recomendar uma carteira real ou enviar 
 
 ## Estado atual
 
-Este permanece o documento canônico de contexto operacional do projeto. O pacote está na versão `0.3.1` — Operational Integrity. Foram concluídos:
+Este permanece o documento canônico de contexto operacional do projeto. O pacote está na versão `0.3.2` — Packaging Integrity. Foram concluídos:
 
 1. arqueologia de onze projetos open source;
 2. kernel contábil e de política;
