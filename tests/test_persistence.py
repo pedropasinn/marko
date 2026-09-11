@@ -208,11 +208,13 @@ def samples() -> tuple[Activity, Observation, ModelRun, DecisionPacket]:
             Holding("RISK", Money.of("400", "BRL"), Money.of("10", "BRL")),
         ),
         targets=(
-            TargetAllocation("DEFENSIVE", Decimal("0.55"), Decimal("0.8")),
-            TargetAllocation("RISK", Decimal("0.35"), Decimal("0.7")),
+            TargetAllocation("DEFENSIVE", Decimal(str(run.candidate.weights[0])), Decimal(1)),
+            TargetAllocation(
+                "RISK", Decimal(1) - Decimal(str(run.candidate.weights[0])), Decimal(1)
+            ),
         ),
         cash=Money.zero("BRL"),
-        cash_target=CashTarget(Decimal("0.10"), Decimal("0.3")),
+        cash_target=CashTarget(Decimal(0), Decimal("0.3")),
         contribution=Money.of("100", "BRL"),
         model_runs=(ValidatedModelRunRef.from_model_run(run),),
         evidence_ids=(observation.observation_id,),

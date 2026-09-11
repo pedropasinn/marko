@@ -150,3 +150,27 @@ def test_rebalancer_rejects_duplicates_and_zero_wealth() -> None:
             targets=(TargetAllocation("ETF", Decimal("0.5"), Decimal(1)),),
             cash=Money.zero("BRL"),
         )
+
+
+@pytest.mark.parametrize("whole_shares", [False, True])
+def test_contribution_purchase_includes_cost_without_discarding_affordable_trade(
+    whole_shares: bool,
+) -> None:
+    packet = CashFlowRebalancer(Decimal(5)).build_packet(
+        packet_id="cost-aware",
+        created_at=datetime(2026, 9, 11, tzinfo=UTC),
+        policy_id="ips",
+        policy_version=1,
+        holdings=(Holding("A", Money.of(1000, "USD"), Money.of(1, "USD"), whole_shares),),
+        targets=(TargetAllocation("A", Decimal(1), Decimal(1)),),
+        cash=Money.zero("USD"),
+        cash_target=CashTarget(Decimal(0), Decimal(1)),
+        contribution=Money.of(2000, "USD"),
+    )
+    draft = packet.alternatives[1]
+    assert len(draft.trades) == 1
+    trade = draft.trades[0]
+    assert trade.notional.amount == Decimal(1999)
+    assert trade.estimated_cost.amount == Decimal(1)
+    assert draft.unallocated_cash.amount == 0
+    assert draft.feasible

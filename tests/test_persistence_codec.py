@@ -180,11 +180,13 @@ def test_model_run_and_decision_packet_round_trip_without_losing_validation() ->
             Holding("RISK", Money.of("400", "BRL"), Money.of("10", "BRL")),
         ),
         targets=(
-            TargetAllocation("DEFENSIVE", Decimal("0.55"), Decimal("0.8")),
-            TargetAllocation("RISK", Decimal("0.35"), Decimal("0.7")),
+            TargetAllocation("DEFENSIVE", Decimal(str(run.candidate.weights[0])), Decimal(1)),
+            TargetAllocation(
+                "RISK", Decimal(1) - Decimal(str(run.candidate.weights[0])), Decimal(1)
+            ),
         ),
         cash=Money.zero("BRL"),
-        cash_target=CashTarget(Decimal("0.10"), Decimal("0.3")),
+        cash_target=CashTarget(Decimal(0), Decimal("0.3")),
         contribution=Money.of("100", "BRL"),
         model_runs=(
             ValidatedModelRunRef.from_model_run(
@@ -236,10 +238,18 @@ def test_legacy_decision_packets_remain_readable_without_retaining_returns(
         created_at=NOW,
         policy_id="ips",
         policy_version=1,
-        holdings=(Holding("ASSET", Money.of("100", "BRL"), Money.of("1", "BRL")),),
-        targets=(TargetAllocation("ASSET", Decimal("0.9"), Decimal("1")),),
+        holdings=(
+            Holding("DEFENSIVE", Money.of("60", "BRL"), Money.of("1", "BRL")),
+            Holding("RISK", Money.of("40", "BRL"), Money.of("1", "BRL")),
+        ),
+        targets=(
+            TargetAllocation("DEFENSIVE", Decimal(str(run.candidate.weights[0])), Decimal(1)),
+            TargetAllocation(
+                "RISK", Decimal(1) - Decimal(str(run.candidate.weights[0])), Decimal(1)
+            ),
+        ),
         cash=Money.zero("BRL"),
-        cash_target=CashTarget(Decimal("0.1"), Decimal("1")),
+        cash_target=CashTarget(Decimal(0), Decimal("1")),
         contribution=Money.of("10", "BRL"),
         model_runs=(
             ValidatedModelRunRef.from_model_run(
@@ -300,10 +310,18 @@ def test_decision_packet_ref_rejects_unknown_fields_and_detects_tampering(
         created_at=NOW,
         policy_id="ips",
         policy_version=1,
-        holdings=(Holding("ASSET", Money.of("100", "BRL"), Money.of("1", "BRL")),),
-        targets=(TargetAllocation("ASSET", Decimal("0.9"), Decimal("1")),),
+        holdings=(
+            Holding("DEFENSIVE", Money.of("60", "BRL"), Money.of("1", "BRL")),
+            Holding("RISK", Money.of("40", "BRL"), Money.of("1", "BRL")),
+        ),
+        targets=(
+            TargetAllocation("DEFENSIVE", Decimal(str(run.candidate.weights[0])), Decimal(1)),
+            TargetAllocation(
+                "RISK", Decimal(1) - Decimal(str(run.candidate.weights[0])), Decimal(1)
+            ),
+        ),
         cash=Money.zero("BRL"),
-        cash_target=CashTarget(Decimal("0.1"), Decimal("1")),
+        cash_target=CashTarget(Decimal(0), Decimal("1")),
         contribution=Money.of("10", "BRL"),
         model_runs=(reference,),
     )

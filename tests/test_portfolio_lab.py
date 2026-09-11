@@ -11,7 +11,12 @@ from marko.portfolio_lab import (
     PortfolioCandidate,
     PortfolioProblem,
     RiskBudgeting,
+    SkfolioCVaRAdapter,
+    SkfolioHRPAdapter,
+    SkfolioMinimumVarianceAdapter,
+    SkfolioRiskBudgetingAdapter,
     check_candidate,
+    validate_candidate,
 )
 from marko.research_registry import ModelRunRegistry, SolverRecord, execute_model_run
 
@@ -97,6 +102,55 @@ def test_candidate_rejects_dimension_and_asset_order_mismatch() -> None:
         "done",
     )
     assert "asset_order" in check_candidate(candidate, problem())
+
+
+@pytest.mark.parametrize(
+    "status", ["infeasible", "unbounded", "max_iterations", "optimal_inaccurate", "upstream"]
+)
+def test_solver_failure_is_not_a_validated_solution(status: str) -> None:
+    candidate = PortfolioCandidate("failed", problem().assets, (0.5, 0.3, 0.2), 0, 0, status)
+    with pytest.raises(ValueError, match="solver_status"):
+        validate_candidate(candidate, problem())
+
+
+def test_single_asset_and_drifted_current_weights_are_supported() -> None:
+    single = PortfolioProblem(("A",), ((0.01,), (-0.01,), (0.0,)), current_weights=(1.0,))
+    assert MinimumVariance().solve(single).weights == pytest.approx((1.0,))
+    drifted = PortfolioProblem(
+        ("A", "B"),
+        ((0.01, 0.0), (0.0, 0.01)),
+        current_weights=(0.9, 0.1),
+        maximum_weights=(0.6, 0.6),
+    )
+    assert check_candidate(NoAction().solve(drifted), drifted) == ("maximum_weight",)
+    assert not check_candidate(EqualWeight().solve(drifted), drifted)
+    with pytest.raises(ValueError, match="long-only"):
+        PortfolioProblem(("A", "B"), drifted.returns, current_weights=(-0.1, 1.1))
+
+
+@pytest.mark.optional
+@pytest.mark.parametrize(
+    "adapter",
+    [
+        SkfolioMinimumVarianceAdapter,
+        SkfolioRiskBudgetingAdapter,
+        SkfolioHRPAdapter,
+        SkfolioCVaRAdapter,
+    ],
+)
+def test_skfolio_adapters_apply_bounds_and_record_real_diagnostics(adapter: type) -> None:
+    pytest.importorskip("skfolio")
+    task = problem()
+    candidate = adapter().solve(task)
+    assert not check_candidate(candidate, task)
+    diagnostics = dict(candidate.diagnostics)
+    assert "skfolio_version" in diagnostics
+    if adapter is SkfolioHRPAdapter:
+        assert diagnostics["linkage_rows"] == "2"
+    else:
+        assert candidate.solver_status == "optimal"
+        assert diagnostics["solver"]
+        assert np.isfinite(float(diagnostics["objective"]))
 
 
 @pytest.mark.optional

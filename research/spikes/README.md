@@ -1,5 +1,11 @@
 # Spikes quantitativos
 
+## Auditoria atual — 009
+
+[`009-current-audit/run.py`](009-current-audit/run.py) reproduz defeitos financeiros e um ciclo sintético Marko → skfolio → DecisionPacket. Usa 252 observações e seed 42; a execução com a fonte atual do skfolio e suas limitações estão em [`UPSTREAM_AUDIT.md`](../../docs/research/UPSTREAM_AUDIT.md). O resultado não valida rentabilidade. Nenhuma chamada a LLM, provider, broker ou banco é feita pelo script.
+
+## Spikes originais — 001 a 008
+
 Todos usam 504 retornos diários sintéticos, quatro ativos, semente `20260820` e o mesmo hash serializado. Os ambientes são separados porque Riskfolio exige CVXPY recente e cvxportfolio fixa CVXPY `<1.7`.
 
 ```bash

@@ -8,6 +8,7 @@ from marko.portfolio_lab import (
     PortfolioCandidate,
     PortfolioModel,
     PortfolioProblem,
+    check_candidate,
     validate_candidate,
 )
 
@@ -76,6 +77,7 @@ class WalkForwardResult:
     turnover: float
     estimated_cost: float
     weights: tuple[float, ...]
+    violations: tuple[str, ...] = ()
 
 
 def evaluate_walk_forward(
@@ -84,9 +86,30 @@ def evaluate_walk_forward(
     splits: tuple[TemporalSplit, ...],
     transaction_cost_bps: float = 0.0,
 ) -> tuple[WalkForwardResult, ...]:
-    if transaction_cost_bps < 0:
-        raise ValueError("transaction_cost_bps não pode ser negativo")
+    """Buy-and-hold entre decisões; bps incidem em cada perna negociada, na entrada."""
+    if not np.isfinite(transaction_cost_bps) or not 0 <= transaction_cost_bps < 10_000:
+        raise ValueError("transaction_cost_bps precisa ser finito e entre zero e 10000")
     matrix = problem.matrix()
+    previous_end: int | None = None
+    for split in splits:
+        for indices, minimum in ((split.train_indices, 2), (split.test_indices, 1)):
+            if (
+                len(indices) < minimum
+                or any(type(index) is not int for index in indices)
+                or tuple(sorted(set(indices))) != indices
+                or indices[0] < 0
+                or indices[-1] >= len(matrix)
+            ):
+                raise ValueError("índices temporais inválidos, repetidos ou fora de ordem")
+        if split.train_indices[-1] >= split.test_indices[0]:
+            raise ValueError("treino precisa preceder o teste sem sobreposição")
+        if split.test_indices != tuple(range(split.test_indices[0], split.test_indices[-1] + 1)):
+            raise ValueError("teste precisa ser contínuo")
+        if previous_end is not None and split.test_indices[0] != previous_end + 1:
+            raise ValueError(
+                "janelas de teste precisam ser consecutivas, sem lacunas ou sobreposição"
+            )
+        previous_end = split.test_indices[-1]
     previous = np.asarray(problem.current_weights) if problem.current_weights else None
     results = []
     for split_index, split in enumerate(splits):
@@ -100,22 +123,46 @@ def evaluate_walk_forward(
             problem.maximum_weights,
         )
         candidate = model.solve(task)
-        validate_candidate(candidate, task)
+        violations = check_candidate(candidate, task)
+        if candidate.model_id != "no_action" or any(
+            violation not in {"minimum_weight", "maximum_weight"} for violation in violations
+        ):
+            validate_candidate(candidate, task)
         weights = np.asarray(candidate.weights)
-        portfolio_returns = test @ weights
-        current_turnover = turnover(previous, weights) if previous is not None else 0.0
-        gross_return = float(np.prod(1 + portfolio_returns) - 1)
-        estimated_cost = current_turnover * transaction_cost_bps / 10_000
+        positions = np.cumprod(1 + test, axis=0) * weights
+        nav = np.concatenate(([1.0], positions.sum(axis=1)))
+        if np.any(nav <= 0):
+            raise ValueError("patrimônio após retorno precisa ser positivo")
+        portfolio_returns = nav[1:] / nav[:-1] - 1
+        current_turnover = turnover(previous, weights) if previous is not None else 1.0
+        gross_return = float(nav[-1] - 1)
+        rate = transaction_cost_bps / 10_000
+        if previous is not None and np.array_equal(previous, weights):
+            estimated_cost = 0.0
+        elif previous is None:
+            estimated_cost = rate / (1 + rate)
+        else:
+            # Os pesos-alvo incidem sobre o patrimônio líquido da própria taxa.
+            low, high = 0.0, 1.0
+            for _ in range(60):
+                cost = (low + high) / 2
+                required = rate * float(np.abs((1 - cost) * weights - previous).sum())
+                if cost > required:
+                    high = cost
+                else:
+                    low = cost
+            estimated_cost = (low + high) / 2 if rate else 0.0
         results.append(
             WalkForwardResult(
                 candidate.model_id,
                 split_index,
                 gross_return,
-                gross_return - estimated_cost,
-                float(portfolio_returns.std(ddof=1)),
+                (1 - estimated_cost) * (1 + gross_return) - 1,
+                float(portfolio_returns.std(ddof=1)) if len(test) > 1 else 0.0,
                 current_turnover,
                 estimated_cost,
                 candidate.weights,
+                violations,
             )
         )
         asset_growth = np.prod(1 + test, axis=0)

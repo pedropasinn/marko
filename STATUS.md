@@ -1,10 +1,12 @@
 # Estado do Marko
 
+Revisão de 11/09/2026: as falhas da [auditoria executável](docs/research/UPSTREAM_AUDIT.md) foram convertidas em regressões e corrigidas: retorno/drift no walk-forward, custos no orçamento, status de solver, datas futuras e coerência entre política, targets e ModelRun. O skfolio 1.0.6 agora fornece mínima variância, risk budgeting, HRP e CVaR por adapters. O [protocolo prospectivo](config/shadow-usd-2026.toml) fixa seis meses de US$ 10.000 virtuais por modelo; a operação privada está separada da API pública sintética. O [plano de reaproveitamento](docs/research/REUSE_PLAN.md) mantém os próximos passos e limites.
+
 Atualizado em 20/08/2026. Versão atual: `0.3.2` — Packaging Integrity.
 
 ## Em uma frase
 
-O Marko persiste fatos contábeis, dados ponto-no-tempo, pesquisa, solicitações e decisões shadow em contratos auditáveis, e os expõe por API e Console somente leitura; capital real e dados reais continuam bloqueados.
+O Marko persiste fatos contábeis e pesquisa auditáveis e opera um experimento privado com cotações de mercado e capital exclusivamente virtual; API e Console públicos permanecem sintéticos e somente leitura. Capital real continua bloqueado.
 
 ## Gates
 
@@ -30,12 +32,12 @@ O Marko persiste fatos contábeis, dados ponto-no-tempo, pesquisa, solicitaçõe
 1. cadastrar as duas identidades fora do Git e ativar o modo privado já implementado;
 2. receber os dados ainda ausentes e gerar o IPS apenas em configuração privada;
 3. obter as credenciais e contratos atuais de ANBIMA e B3;
-4. definir duração mínima e iniciar ciclos shadow sem capital real;
+4. observar a campanha prospectiva de 14/09/2026 a 14/03/2027, com fechamento marcado na última sessão de 12/03;
 5. manter capital real bloqueado até revisão humana e histórico operacional suficiente.
 
 ## Qualidade
 
-O CI preserva Ruff, MyPy strict, cobertura mínima de 80%, integração PostgreSQL/Parquet, adapters opcionais e smokes de providers. A versão `0.3.2` também inspeciona conteúdo e tamanho do source distribution; wheel e Console continuam com build e smoke próprios. A validação local atual tem 156 testes aprovados, 3 integrações condicionais ignoradas e 82,77% de cobertura.
+O CI preserva Ruff, MyPy strict, cobertura mínima de 80%, integração PostgreSQL/Parquet, adapters opcionais e smokes de providers. A versão `0.3.2` também inspeciona conteúdo e tamanho do source distribution; wheel e Console continuam com build e smoke próprios. A campanha acrescenta testes de execução após custos, dividendos recebíveis, splits, disponibilidade temporal, hashes, calendário e operação idempotente. Totais de testes são evidência de cada execução do CI, não garantia de rentabilidade.
 
 Ambiente público: [Console](https://marko-console.vercel.app) e [Read API](https://marko-api.vercel.app/api/v1/status). Ambos são sintéticos; Neon Auth apenas habilitada não autoriza ingestão de dados reais.
 

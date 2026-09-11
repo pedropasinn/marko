@@ -4,6 +4,20 @@ As mudanças relevantes do Marko serão registradas aqui por versão.
 
 ## [Unreleased]
 
+### Corrigido
+
+- walk-forward evolui quantidades/pesos após retornos, aplica custos antes do crescimento e rejeita treino futuro ou janelas incompatíveis;
+- custos cabem no orçamento; drift corrente pode superar bounds do alvo; não convergência não gera candidato validado;
+- política e targets precisam corresponder ao ModelRun de origem, inclusive quando referências compactas são reidratadas;
+- status históricos genéricos de solver como `upstream` não são aceitos como comprovação atual de convergência. Registros anteriores permanecem preservados; revalidação exige evidência do solver, não migração silenciosa.
+
+### Adicionado
+
+- adapters skfolio 1.0.6 para mínima variância, risk budgeting, HRP e CVaR;
+- campanha prospectiva privada de seis meses e US$ 10.000 virtuais por modelo, com configuração congelada, preços observados, execução na abertura posterior, custos, recebíveis e recuperação sem decisões retroativas;
+- registros e snapshots imutáveis verificáveis, relatórios diários/semanais e CSV;
+- auditorias independentes determinísticas e revisão pela assinatura Codex local, sem API paga, sem autoridade de negociação ou alteração automática da campanha.
+
 ## [0.3.2] — 2026-08-20
 
 ### Corrigido

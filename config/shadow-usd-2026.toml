@@ -1,0 +1,16 @@
+campaign_id = "usd-10000-2026-09"
+start_date = "2026-09-14"
+end_date = "2027-03-14"
+initial_capital_usd = "10000.00"
+symbols = ["SPY", "EFA", "IEMG", "IEF", "GLD", "BIL"]
+models = ["equal_weight", "minimum_variance", "risk_budgeting", "hrp", "cvar"]
+benchmarks = ["cash", "spy_buy_hold", "sixty_forty"]
+training_sessions = 252
+maximum_weight = 0.60
+transaction_cost_bps = "5"
+rebalance = "month_end"
+currency = "USD"
+calendar = "NYSE"
+dividend_policy = "receivable_not_reinvested"
+personal_taxes = "excluded"
+real_capital = false

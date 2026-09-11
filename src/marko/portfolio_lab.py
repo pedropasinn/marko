@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
-from typing import Protocol
+from typing import Any, Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -24,20 +24,28 @@ class PortfolioProblem:
             raise ValueError("matriz de retornos incompatível")
         if not np.isfinite(matrix).all():
             raise ValueError("retornos precisam ser finitos")
+        if np.any(matrix < -1):
+            raise ValueError("retornos simples não podem ser inferiores a -100%")
         for vector in (self.current_weights, self.minimum_weights, self.maximum_weights):
             if vector and len(vector) != len(self.assets):
                 raise ValueError("vetor de pesos incompatível")
             if vector and not np.isfinite(np.asarray(vector)).all():
                 raise ValueError("vetor de pesos precisa ser finito")
         lower, upper = self.bounds()
-        if np.any(lower > upper) or lower.sum() > 1 + 1e-12 or upper.sum() < 1 - 1e-12:
+        if (
+            np.any(lower < 0)
+            or np.any(upper > 1)
+            or np.any(lower > upper)
+            or lower.sum() > 1 + 1e-12
+            or upper.sum() < 1 - 1e-12
+        ):
             raise ValueError("bounds inviáveis")
         if self.current_weights:
             current = np.asarray(self.current_weights)
             if abs(float(current.sum()) - 1) > 1e-7:
                 raise ValueError("pesos atuais precisam somar um")
-            if np.any(current < lower - 1e-7) or np.any(current > upper + 1e-7):
-                raise ValueError("pesos atuais violam bounds")
+            if np.any(current < 0) or np.any(current > 1):
+                raise ValueError("pesos atuais precisam ser long-only")
 
     def matrix(self) -> npt.NDArray[np.float64]:
         return np.asarray(self.returns, dtype=float)
@@ -140,7 +148,7 @@ class MinimumVariance:
         self.tolerance = tolerance
 
     def solve(self, problem: PortfolioProblem) -> PortfolioCandidate:
-        covariance = np.cov(problem.matrix(), rowvar=False, ddof=1)
+        covariance = np.atleast_2d(np.cov(problem.matrix(), rowvar=False, ddof=1))
         covariance = (1 - self.shrinkage) * covariance + self.shrinkage * np.diag(
             np.diag(covariance)
         )
@@ -172,7 +180,7 @@ class RiskBudgeting:
     model_id = "risk_budgeting"
 
     def solve(self, problem: PortfolioProblem) -> PortfolioCandidate:
-        covariance = np.cov(problem.matrix(), rowvar=False, ddof=1)
+        covariance = np.atleast_2d(np.cov(problem.matrix(), rowvar=False, ddof=1))
         lower, upper = problem.bounds()
         weights = InverseVolatility().solve(problem).weights
         vector = np.asarray(weights)
@@ -211,8 +219,109 @@ class SkfolioMinimumVarianceAdapter:
             risk_measure=RiskMeasure.VARIANCE,
             min_weights=lower,
             max_weights=upper,
-        ).fit(problem.matrix())
-        return _candidate(self.model_id, problem, np.asarray(model.weights_), "upstream")
+            save_problem=True,
+        )
+        return _skfolio_candidate(self.model_id, problem, model)
+
+
+class SkfolioRiskBudgetingAdapter:
+    model_id = "skfolio_risk_budgeting"
+
+    def solve(self, problem: PortfolioProblem) -> PortfolioCandidate:
+        from skfolio.optimization import RiskBudgeting as UpstreamRiskBudgeting
+
+        lower, upper = problem.bounds()
+        return _skfolio_candidate(
+            self.model_id,
+            problem,
+            UpstreamRiskBudgeting(min_weights=lower, max_weights=upper, save_problem=True),
+        )
+
+
+class SkfolioHRPAdapter:
+    model_id = "skfolio_hrp"
+
+    def solve(self, problem: PortfolioProblem) -> PortfolioCandidate:
+        from skfolio.optimization import HierarchicalRiskParity
+
+        lower, upper = problem.bounds()
+        return _skfolio_candidate(
+            self.model_id,
+            problem,
+            HierarchicalRiskParity(min_weights=lower, max_weights=upper),
+            hierarchical=True,
+        )
+
+
+class SkfolioCVaRAdapter:
+    model_id = "skfolio_cvar"
+
+    def __init__(self, beta: float = 0.95) -> None:
+        if not 0 < beta < 1:
+            raise ValueError("beta precisa estar entre zero e um, exclusivos")
+        self.beta = beta
+
+    def solve(self, problem: PortfolioProblem) -> PortfolioCandidate:
+        from skfolio import RiskMeasure
+        from skfolio.optimization import MeanRisk, ObjectiveFunction
+
+        lower, upper = problem.bounds()
+        return _skfolio_candidate(
+            self.model_id,
+            problem,
+            MeanRisk(
+                objective_function=ObjectiveFunction.MINIMIZE_RISK,
+                risk_measure=RiskMeasure.CVAR,
+                cvar_beta=self.beta,
+                min_weights=lower,
+                max_weights=upper,
+                save_problem=True,
+            ),
+        )
+
+
+def _skfolio_candidate(
+    model_id: str,
+    problem: PortfolioProblem,
+    model: Any,
+    *,
+    hierarchical: bool = False,
+) -> PortfolioCandidate:
+    import skfolio
+
+    diagnostics = [("skfolio_version", skfolio.__version__)]
+    if len(problem.assets) == 1:
+        return _candidate(
+            model_id,
+            problem,
+            np.ones(1),
+            "closed_form",
+            tuple((*diagnostics, ("algorithm", "single_asset"))),
+        )
+    model.fit(problem.matrix())
+    if hierarchical:
+        status = "closed_form"
+        diagnostics.extend(
+            [
+                ("algorithm", "hierarchical_risk_parity"),
+                (
+                    "linkage_rows",
+                    str(len(model.hierarchical_clustering_estimator_.linkage_matrix_)),
+                ),
+            ]
+        )
+    else:
+        solved = model.problem_
+        status = str(solved.status)
+        diagnostics.extend(
+            [
+                ("solver", str(solved.solver_stats.solver_name)),
+                ("iterations", str(solved.solver_stats.num_iters)),
+                ("solve_time", str(solved.solver_stats.solve_time)),
+                ("objective", str(solved.value)),
+            ]
+        )
+    return _candidate(model_id, problem, np.asarray(model.weights_), status, tuple(diagnostics))
 
 
 class PyPortfolioOptMinimumVarianceAdapter:
@@ -226,9 +335,19 @@ class PyPortfolioOptMinimumVarianceAdapter:
         lower, upper = problem.bounds()
         bounds = list(zip(lower.tolist(), upper.tolist(), strict=True))
         matrix = problem.matrix()
-        frontier = EfficientFrontier(matrix.mean(axis=0), np.cov(matrix, rowvar=False), bounds)
+        frontier = EfficientFrontier(
+            matrix.mean(axis=0),
+            np.atleast_2d(np.cov(matrix, rowvar=False)),
+            bounds,
+        )
         frontier.min_volatility()
-        return _candidate(self.model_id, problem, np.asarray(frontier.weights), "upstream")
+        return _candidate(
+            self.model_id,
+            problem,
+            np.asarray(frontier.weights),
+            str(frontier._opt.status),
+            (("solver", str(frontier._opt.solver_stats.solver_name)),),
+        )
 
 
 def check_candidate(
@@ -239,6 +358,11 @@ def check_candidate(
     weights = np.asarray(candidate.weights)
     lower, upper = problem.bounds()
     violations = []
+    accepted_statuses = {"optimal", "converged", "closed_form"}
+    if candidate.model_id == "no_action":
+        accepted_statuses.add("not_solved")
+    if candidate.solver_status not in accepted_statuses:
+        violations.append("solver_status:" + candidate.solver_status)
     if candidate.assets != problem.assets:
         violations.append("asset_order")
     if len(candidate.weights) != len(problem.assets):
@@ -274,7 +398,8 @@ def _candidate(
 ) -> PortfolioCandidate:
     matrix = problem.matrix()
     expected_return = float(matrix.mean(axis=0) @ weights)
-    volatility = float(np.sqrt(weights @ np.cov(matrix, rowvar=False, ddof=1) @ weights))
+    covariance = np.atleast_2d(np.cov(matrix, rowvar=False, ddof=1))
+    volatility = float(np.sqrt(max(float(weights @ covariance @ weights), 0.0)))
     return PortfolioCandidate(
         model_id,
         problem.assets,

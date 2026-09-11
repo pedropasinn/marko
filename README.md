@@ -14,7 +14,21 @@ Os deploys são demonstrativos e usam exclusivamente dados sintéticos. A infrae
 
 O desenvolvimento é público. O [estado atual](STATUS.md), o [roadmap](docs/roadmap.md), o [changelog](CHANGELOG.md), o [diário de desenvolvimento](docs/development-log.md), as issues e as discussões mostram o que foi concluído, o que falhou e o que vem depois.
 
-## Desenvolvimento
+## Campanha prospectiva (capital virtual)
+
+O protocolo aprovado compara cinco modelos com US$ 10.000 cada, de 14/09/2026 a 14/03/2027, com três benchmarks independentes. Não se somam carteiras alternativas. Cotações e relatórios ficam em repositório operacional privado, sem alterar a demonstração pública.
+
+```bash
+uv sync --group dev --extra experiment
+uv run --frozen --extra experiment python -m marko.experiment run --config config/shadow-usd-2026.toml --state-dir /caminho/privado/state
+uv run --frozen --extra experiment python -m marko.experiment verify --config config/shadow-usd-2026.toml --state-dir /caminho/privado/state
+```
+
+O comando exige checkout limpo: o commit e o lock de dependências ficam congelados no manifesto. Há coleta Yahoo/yfinance, calendário NYSE, custos de 5 bps por lado e distribuições em recebíveis não reinvestidos. Recuperação que cruza split não normalizado é bloqueada explicitamente. Nenhuma ordem real é enviada; valor final é marcado a mercado, não lucro realizado.
+
+Orçamento de APIs zero. Regras diárias não são IA; revisores Codex usam a assinatura local quando máquina, autenticação e quota permitem. Propostas de código não são promovidas automaticamente. A rotina remota e seus relatórios não dependem desses pareceres, mas mostram sua ausência.
+
+## Desenvolvimento local
 
 ```bash
 uv sync --group dev

@@ -15,5 +15,8 @@ Esta é uma classificação técnica conservadora, não parecer jurídico.
 | Ghostfolio | AGPL-3.0 | referência de produto |
 | Wealthfolio | AGPL-3.0 | referência de produto |
 | Portfolio Performance | EPL-1.0 | oráculo/referência, sem copiar módulos |
+| TradingAgents (adicionado em 11/09/2026) | Apache-2.0 no repositório | pesquisa/adapter proposto; revisar dependências transitivas antes da integração |
 
 Qualquer mudança de categoria exige ADR e revisão da licença no commit fixado.
+
+A proposta de usar QuantStats como dependência opcional de relatórios está em [`REUSE_PLAN.md`](REUSE_PLAN.md). Não foi incorporada nesta auditoria. A separação em processo, por si só, não elimina obrigações de licença.

@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
 
-from marko.portfolio_lab import EqualWeight, MinimumVariance, PortfolioProblem
+from marko.portfolio_lab import EqualWeight, MinimumVariance, NoAction, PortfolioProblem
 from marko.validation import (
+    TemporalSplit,
     evaluate_walk_forward,
     perturbation_sensitivity,
     purged_kfold_splits,
@@ -31,7 +32,65 @@ def test_walk_forward_has_purge_and_no_overlap() -> None:
         EqualWeight(), sample_problem(), splits, transaction_cost_bps=10
     )
     assert len(results) == 2
-    assert results[0].realized_return == results[0].gross_return - results[0].estimated_cost
+    assert results[0].realized_return == pytest.approx(
+        (1 - results[0].estimated_cost) * (1 + results[0].gross_return) - 1
+    )
+
+
+def test_no_action_returns_follow_unchanged_quantities_and_allow_drift() -> None:
+    problem = PortfolioProblem(
+        ("A", "B"),
+        ((0.01, 0.02), (0.02, 0.01), (1.0, 0.0), (-0.5, 0.0)),
+        current_weights=(0.5, 0.5),
+        maximum_weights=(0.6, 0.6),
+    )
+    combined = evaluate_walk_forward(NoAction(), problem, (TemporalSplit((0, 1), (2, 3)),))
+    assert combined[0].gross_return == pytest.approx(0.0)
+    sequential = evaluate_walk_forward(
+        NoAction(),
+        problem,
+        (TemporalSplit((0, 1), (2,)), TemporalSplit((0, 1, 2), (3,))),
+        transaction_cost_bps=10,
+    )
+    assert sequential[0].gross_return == pytest.approx(0.5)
+    assert sequential[1].gross_return == pytest.approx(-1 / 3)
+    assert sequential[1].violations == ("maximum_weight",)
+    assert sequential[1].estimated_cost == pytest.approx(0)
+    assert np.prod([1 + row.realized_return for row in sequential]) == pytest.approx(1.0)
+
+
+def test_rebalance_costs_cover_both_legs_and_reduce_invested_capital() -> None:
+    problem = PortfolioProblem(
+        ("A", "B"),
+        ((0.01, 0.0), (0.0, 0.01), (0.1, 0.1)),
+        current_weights=(1.0, 0.0),
+    )
+    result = evaluate_walk_forward(
+        EqualWeight(),
+        problem,
+        (TemporalSplit((0, 1), (2,)),),
+        transaction_cost_bps=100,
+    )[0]
+    assert result.estimated_cost == pytest.approx(0.01)
+    assert result.realized_return == pytest.approx(0.089)
+    assert result.volatility == 0
+
+
+@pytest.mark.parametrize(
+    "splits",
+    [
+        (TemporalSplit((3, 4), (2,)),),
+        (TemporalSplit((0, 1, 2), (2,)),),
+        (TemporalSplit((0, 0), (2,)),),
+        (TemporalSplit((-1, 0), (2,)),),
+        (TemporalSplit((0, 1), (120,)),),
+        (TemporalSplit((0, 1), (2, 3)), TemporalSplit((0, 1), (3, 4))),
+        (TemporalSplit((0, 1), (2,)), TemporalSplit((0, 1), (4,))),
+    ],
+)
+def test_walk_forward_rejects_invalid_temporal_order(splits: tuple[TemporalSplit, ...]) -> None:
+    with pytest.raises(ValueError):
+        evaluate_walk_forward(EqualWeight(), sample_problem(), splits)
 
 
 @pytest.mark.parametrize("step", [0, -1])

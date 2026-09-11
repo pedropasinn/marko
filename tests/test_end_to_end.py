@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import numpy as np
+import pytest
 
 from marko.decision import (
     CashFlowRebalancer,
@@ -72,3 +73,36 @@ def test_research_result_becomes_auditable_cash_flow_draft() -> None:
         "no_action",
         "cash_flow_only",
     }
+    trades = packet.alternatives[1].trades
+    assert trades
+    assert sum(trade.notional.amount + trade.estimated_cost.amount for trade in trades) <= 2000
+    common = dict(
+        packet_id="binding",
+        created_at=run.created_at,
+        policy_id=run.policy_id,
+        policy_version=run.policy_version,
+        holdings=holdings,
+        targets=targets,
+        cash=Money.zero("BRL"),
+        cash_target=CashTarget(Decimal(0), Decimal(1)),
+        contribution=Money.of(2000, "BRL"),
+        model_runs=packet.model_runs,
+    )
+    with pytest.raises(ValueError, match="política"):
+        CashFlowRebalancer().build_packet(**(common | {"policy_id": "other"}))
+    other_targets = (
+        TargetAllocation("CDI", Decimal("0.4"), Decimal("0.8")),
+        TargetAllocation("IPCA", Decimal("0.3"), Decimal("0.5")),
+        TargetAllocation("GLOBAL", Decimal("0.3"), Decimal("0.6")),
+    )
+    with pytest.raises(ValueError, match="targets divergem"):
+        CashFlowRebalancer().build_packet(**(common | {"targets": other_targets}))
+
+    from marko.persistence.codec import decode_decision_packet, encode_decision_packet
+
+    restored = decode_decision_packet(encode_decision_packet(packet))
+    persisted = common | {"model_runs": restored.model_runs}
+    with pytest.raises(ValueError, match="origem necessário"):
+        CashFlowRebalancer().build_packet(**persisted)
+    rebuilt = CashFlowRebalancer().build_packet(**persisted, model_run_sources=(run,))
+    assert rebuilt.model_run_ids == (run.run_id,)

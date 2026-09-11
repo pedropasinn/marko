@@ -67,8 +67,14 @@ class CashTarget:
         object.__setattr__(self, "maximum_weight", maximum)
 
 
+class _ModelRunContext:
+    # Contexto transitório: envelopes históricos continuam contendo só referências compactas.
+    __slots__ = ("_source_run",)
+    _source_run: ModelRun | None
+
+
 @dataclass(frozen=True, slots=True, init=False)
-class ValidatedModelRunRef:
+class ValidatedModelRunRef(_ModelRunContext):
     run_id: str
     run_payload_hash: str | None
     dataset_fingerprint: str | None = None
@@ -101,6 +107,7 @@ class ValidatedModelRunRef:
             ),
             dataset_available_at=dataset_available_at,
         )
+        object.__setattr__(self, "_source_run", run)
 
     @classmethod
     def from_model_run(
@@ -183,6 +190,7 @@ class ValidatedModelRunRef:
         object.__setattr__(self, "candidate_hash", candidate_hash)
         object.__setattr__(self, "validation_witness", validation_witness)
         object.__setattr__(self, "dataset_available_at", dataset_available_at)
+        object.__setattr__(self, "_source_run", None)
 
     def reconciles_with(self, run: ModelRun) -> bool:
         try:
@@ -206,7 +214,7 @@ class ValidatedModelRunRef:
         )
 
     def with_dataset_available_at(self, value: datetime) -> ValidatedModelRunRef:
-        return type(self)._from_persisted(
+        reference = type(self)._from_persisted(
             run_id=self.run_id,
             run_payload_hash=self.run_payload_hash,
             dataset_fingerprint=self.dataset_fingerprint,
@@ -214,6 +222,8 @@ class ValidatedModelRunRef:
             validation_witness=self.validation_witness,
             dataset_available_at=value,
         )
+        object.__setattr__(reference, "_source_run", self._source_run)
+        return reference
 
 
 def _content_hash(domain: str, value: object) -> str:
@@ -372,6 +382,7 @@ class CashFlowRebalancer:
         cash_target: CashTarget,
         contribution: Money,
         model_runs: tuple[ValidatedModelRunRef, ...] = (),
+        model_run_sources: tuple[ModelRun, ...] = (),
         evidence_ids: tuple[str, ...] = (),
         minimum_cash: Money | None = None,
         maximum_turnover: Decimal | None = None,
@@ -411,6 +422,33 @@ class CashFlowRebalancer:
         run_ids = tuple(run.run_id for run in model_runs)
         if len(run_ids) != len(set(run_ids)):
             raise ValueError("model runs duplicados")
+        sources = {run.run_id: run for run in model_run_sources}
+        if len(sources) != len(model_run_sources) or set(sources) - set(run_ids):
+            raise ValueError("origens de ModelRun duplicadas ou sem referência")
+        for reference in model_runs:
+            run = sources.get(reference.run_id, reference._source_run)
+            if run is None or not reference.reconciles_with(run):
+                raise ValueError(
+                    "ModelRun de origem necessário para verificar referência persistida"
+                )
+            if (run.policy_id, run.policy_version) != (policy_id, policy_version):
+                raise ValueError("política diverge do ModelRun")
+            cutoff = knowledge_cutoff or created_at
+            if run.created_at > created_at or (
+                reference.dataset_available_at is not None
+                and reference.dataset_available_at > cutoff
+            ):
+                raise ValueError("ModelRun ou dados indisponíveis no instante da decisão")
+            proposed = {target.instrument_id: float(target.target_weight) for target in targets}
+            if "cash" in run.candidate.assets:
+                proposed["cash"] = float(cash_target.target_weight)
+            elif cash_target.target_weight != 0:
+                raise ValueError("target de caixa não foi validado no ModelRun")
+            validated_weights = run.candidate.weight_map()
+            if proposed.keys() != validated_weights.keys() or any(
+                abs(weight - validated_weights[asset]) > 1e-7 for asset, weight in proposed.items()
+            ):
+                raise ValueError("targets divergem do ModelRun; transformação exige nova validação")
         no_action = self._no_action(
             holdings, targets, cash, cash_target, contribution, minimum_cash
         )
@@ -503,7 +541,15 @@ class CashFlowRebalancer:
             holding = holding_map[instrument_id]
             target = target_map[instrument_id]
             room = max(target.maximum_weight * total - values[instrument_id], Decimal(0))
-            notional = min(deficit, room, cash_available)
+            rate = self.estimated_cost_bps / Decimal(10_000)
+            affordable = (cash_available / (Decimal(1) + rate)).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_DOWN,
+            )
+            notional = min(deficit, room, affordable).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_DOWN,
+            )
             quantity = notional / holding.price.amount
             if holding.whole_shares:
                 quantity = quantity.quantize(Decimal(1), rounding=ROUND_DOWN)
@@ -515,7 +561,13 @@ class CashFlowRebalancer:
                 continue
             cost = (notional * self.estimated_cost_bps / Decimal(10_000)).quantize(Decimal("0.01"))
             if notional + cost > cash_available:
-                continue
+                # A taxa arredondada pode exceder o saldo por menos de um centavo.
+                decrement = holding.price.amount if holding.whole_shares else Decimal("0.01")
+                notional -= decrement
+                quantity = notional / holding.price.amount
+                cost = (notional * rate).quantize(Decimal("0.01"))
+                if quantity <= 0 or notional < minimum or notional + cost > cash_available:
+                    continue
             trade = TradeProposal(
                 instrument_id,
                 TradeSide.BUY,
